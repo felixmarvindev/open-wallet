@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: ledger-service
+  profiles:
+    active: local
+
+server:
+  port: 8084
+
+logging:
+  level:
+    root: INFO
+    com.openwallet: DEBUG
+

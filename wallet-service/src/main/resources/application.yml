@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: wallet-service
+  profiles:
+    active: local
+
+server:
+  port: 8083
+
+logging:
+  level:
+    root: INFO
+    com.openwallet: DEBUG
+

@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: notification-service
+  profiles:
+    active: local
+
+server:
+  port: 8085
+
+logging:
+  level:
+    root: INFO
+    com.openwallet: DEBUG
+
