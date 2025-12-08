@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/openwallet
+    url: jdbc:postgresql://localhost:5433/openwallet
     username: openwallet
     password: openwallet
     driver-class-name: org.postgresql.Driver
@@ -35,6 +35,18 @@ management:
   endpoint:
     health:
       show-details: always
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: db,kafka,diskSpace,ping
+        liveness:
+          include: ping,diskSpace
+  health:
+    db:
+      enabled: true
+    kafka:
+      enabled: true
   metrics:
     export:
       prometheus:
