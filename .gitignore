@@ -69,10 +69,11 @@ Thumbs.db
 
 # Spring Boot
 application-local.properties
-application-local.yml
+# Note: application-local.yml is committed as it contains project-specific local dev config
 application-*.properties
 !application.properties
 !application.yml
+!application-local.yml
 
 # Environment variables
 .env
@@ -129,4 +130,5 @@ dump.rdb
 
 # PostgreSQL
 *.sql.backup
+
 
