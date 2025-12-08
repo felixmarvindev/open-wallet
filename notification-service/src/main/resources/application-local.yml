@@ -39,13 +39,11 @@ management:
         enabled: true
       group:
         readiness:
-          include: db,kafka,diskSpace,ping
+          include: db,diskSpace,ping
         liveness:
           include: ping,diskSpace
   health:
     db:
-      enabled: true
-    kafka:
       enabled: true
   metrics:
     export:

@@ -49,15 +49,13 @@ management:
         enabled: true
       group:
         readiness:
-          include: db,redis,kafka,diskSpace,ping
+          include: db,redis,diskSpace,ping
         liveness:
           include: ping,diskSpace
   health:
     db:
       enabled: true
     redis:
-      enabled: true
-    kafka:
       enabled: true
   metrics:
     export:
