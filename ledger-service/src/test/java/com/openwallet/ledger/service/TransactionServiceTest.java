@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @Import({ com.openwallet.ledger.config.JpaConfig.class, TransactionService.class })
 @ActiveProfiles("test")
-@SuppressWarnings({ "ConstantConditions", "DataFlowIssue" })
+@SuppressWarnings({ "ConstantConditions", "DataFlowIssue", "null" })
 class TransactionServiceTest {
 
     @Autowired

@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DataJpaTest
 @Import({ JpaConfig.class, WalletService.class })
 @ActiveProfiles("test")
-@SuppressWarnings({"ConstantConditions" })
+@SuppressWarnings({ "ConstantConditions", "null" })
 class WalletServiceTest {
 
     @Autowired

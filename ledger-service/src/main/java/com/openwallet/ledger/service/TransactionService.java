@@ -9,6 +9,8 @@ import com.openwallet.ledger.dto.DepositRequest;
 import com.openwallet.ledger.dto.TransactionResponse;
 import com.openwallet.ledger.dto.TransferRequest;
 import com.openwallet.ledger.dto.WithdrawalRequest;
+import com.openwallet.ledger.events.TransactionEvent;
+import com.openwallet.ledger.events.TransactionEventProducer;
 import com.openwallet.ledger.exception.TransactionNotFoundException;
 import com.openwallet.ledger.repository.LedgerEntryRepository;
 import com.openwallet.ledger.repository.TransactionRepository;
@@ -24,11 +26,12 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings({ "DataFlowIssue", "ConstantConditions" })
+@SuppressWarnings({ "DataFlowIssue", "ConstantConditions", "null" })
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
+    private final TransactionEventProducer transactionEventProducer;
 
     @Transactional
     public TransactionResponse createDeposit(DepositRequest request) {
@@ -51,6 +54,7 @@ public class TransactionService {
                 .build();
 
         Transaction saved = Objects.requireNonNull(transactionRepository.save(tx));
+        publishInitiated(saved);
         createDoubleEntry(saved,
                 null,
                 request.getToWalletId(),
@@ -58,6 +62,7 @@ public class TransactionService {
         saved.setStatus(TransactionStatus.COMPLETED);
         saved.setCompletedAt(LocalDateTime.now());
         Transaction persisted = Objects.requireNonNull(transactionRepository.save(saved));
+        publishCompleted(persisted);
         return toResponse(persisted);
     }
 
@@ -82,6 +87,7 @@ public class TransactionService {
                 .build();
 
         Transaction saved = Objects.requireNonNull(transactionRepository.save(tx));
+        publishInitiated(saved);
         createDoubleEntry(saved,
                 request.getFromWalletId(),
                 null,
@@ -89,6 +95,7 @@ public class TransactionService {
         saved.setStatus(TransactionStatus.COMPLETED);
         saved.setCompletedAt(LocalDateTime.now());
         Transaction persisted = Objects.requireNonNull(transactionRepository.save(saved));
+        publishCompleted(persisted);
         return toResponse(persisted);
     }
 
@@ -117,6 +124,7 @@ public class TransactionService {
                 .build();
 
         Transaction saved = Objects.requireNonNull(transactionRepository.save(tx));
+        publishInitiated(saved);
         createDoubleEntry(saved,
                 request.getFromWalletId(),
                 request.getToWalletId(),
@@ -124,6 +132,7 @@ public class TransactionService {
         saved.setStatus(TransactionStatus.COMPLETED);
         saved.setCompletedAt(LocalDateTime.now());
         Transaction persisted = Objects.requireNonNull(transactionRepository.save(saved));
+        publishCompleted(persisted);
         return toResponse(persisted);
     }
 
@@ -209,5 +218,35 @@ public class TransactionService {
                 .completedAt(tx.getCompletedAt() != null ? tx.getCompletedAt().toString() : null)
                 .failureReason(tx.getFailureReason())
                 .build();
+    }
+
+    private void publishInitiated(Transaction tx) {
+        TransactionEvent event = TransactionEvent.builder()
+                .transactionId(tx.getId())
+                .eventType("TRANSACTION_INITIATED")
+                .transactionType(tx.getTransactionType().name())
+                .status(tx.getStatus().name())
+                .amount(tx.getAmount())
+                .currency(tx.getCurrency())
+                .fromWalletId(tx.getFromWalletId())
+                .toWalletId(tx.getToWalletId())
+                .build();
+        transactionEventProducer.publish(event);
+    }
+
+    private void publishCompleted(Transaction tx) {
+        TransactionEvent event = TransactionEvent.builder()
+                .transactionId(tx.getId())
+                .eventType("TRANSACTION_COMPLETED")
+                .transactionType(tx.getTransactionType().name())
+                .status(tx.getStatus().name())
+                .amount(tx.getAmount())
+                .currency(tx.getCurrency())
+                .fromWalletId(tx.getFromWalletId())
+                .toWalletId(tx.getToWalletId())
+                .completedAt(tx.getCompletedAt())
+                .failureReason(tx.getFailureReason())
+                .build();
+        transactionEventProducer.publish(event);
     }
 }
