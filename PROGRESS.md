@@ -2,7 +2,7 @@
 
 This document tracks the implementation progress against the 8-hour execution plan.
 
-**Last Updated**: 2025-12-09
+**Last Updated**: 2025-12-09 (Updated after JPA entities creation)
 
 ---
 
@@ -92,14 +92,20 @@ This document tracks the implementation progress against the 8-hour execution pl
   - `fb9a9fa` - feat: create database schema migrations with Flyway
   - (pending) - fix: configure separate Flyway schema history tables per service
 
-### ⏳ Task 2: Create JPA Entities
-- [ ] Create `Customer` entity
-- [ ] Create `KycCheck` entity
-- [ ] Create `Wallet` entity
-- [ ] Create `Transaction` entity
-- [ ] Create `LedgerEntry` entity
-- [ ] Add relationships and validations
-- [ ] Add audit fields (`@CreatedDate`, `@LastModifiedDate`)
+### ✅ Task 2: Create JPA Entities
+- [x] Create `Customer` entity
+- [x] Create `KycCheck` entity
+- [x] Create `Wallet` entity
+- [x] Create `Transaction` entity
+- [x] Create `LedgerEntry` entity
+- [x] Create `Notification` entity
+- [x] Add relationships and validations
+- [x] Add audit fields (`@CreatedDate`, `@LastModifiedDate`)
+- [x] Create JPA configuration with `@EnableJpaAuditing` for all services
+- [x] Create all status enums (CustomerStatus, KycStatus, WalletStatus, TransactionType, TransactionStatus, EntryType, NotificationChannel, NotificationStatus)
+- [x] Add JSONB support for documents and metadata fields
+- [x] Add Bean Validation annotations to all entities
+- [x] Configure proper JPA relationships with cascade options
 
 ### ⏳ Task 3: Create JPA Repositories
 - [ ] Create `CustomerRepository`
@@ -112,7 +118,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 ### ⏳ Task 4: Add Database Configuration
 - [x] JPA/Hibernate configured in `application.yml` (already done)
 - [x] Flyway configuration added (already done)
-- [ ] Test entity persistence manually
+- [x] Test entity persistence via `@DataJpaTest` (H2 with auditing enabled)
 
 ### ⏳ Task 5: Create Basic DTOs
 - [ ] Create DTOs for Customer Service
@@ -121,7 +127,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [ ] Create DTOs for Notification Service
 - [ ] Create DTOs for Auth Service
 
-**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations complete, entities and repositories pending.
+**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations and JPA entities complete; entity persistence tests added; repositories and DTOs pending.
 
 ---
 
@@ -332,10 +338,10 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ## Next Steps
 
-1. **Phase 2, Task 2**: Create JPA entities for all domain models
-2. **Phase 2, Task 3**: Create JPA repositories
-3. **Phase 2, Task 5**: Create basic DTOs
-4. **Phase 3**: Start implementing core business logic and APIs
+1. **Phase 2, Task 3**: Create JPA repositories for all entities
+2. **Phase 2, Task 5**: Create basic DTOs for all services
+3. **Phase 3**: Start implementing core business logic and APIs (wallet + ledger)
+4. Add integration tests for API flows as endpoints are built
 
 ---
 
@@ -344,18 +350,20 @@ This document tracks the implementation progress against the 8-hour execution pl
 | Phase | Estimated Time | Actual Time | Status |
 |-------|---------------|-------------|--------|
 | Phase 1 | 1.5 hours | ~1.5 hours | ✅ Complete |
-| Phase 2 | 1.5 hours | In progress | 🚧 30% complete |
+| Phase 2 | 1.5 hours | In progress | 🚧 70% complete |
 | Phase 3 | 1.5 hours | - | ⏳ Pending |
 | Phase 4 | 1.5 hours | - | ⏳ Pending |
 | Phase 5 | 1.0 hours | - | ⏳ Pending |
 | Phase 6 | 1.0 hours | - | ⏳ Pending |
-| **Total** | **8.0 hours** | **~1.8 hours** | **22% complete** |
+| **Total** | **8.0 hours** | **~2.2 hours** | **35% complete** |
 
 ---
 
 ## Git Commit History
 
 ```
+(pending) - test: add JPA entity persistence tests with H2 auditing and JSON handling
+(pending) - feat: create JPA entities with relationships and audit fields
 fb9a9fa - feat: create database schema migrations with Flyway
 170b804 - fix: remove Kafka from health check groups
 4d148ca - feat: enhance Spring Boot Actuator health checks
