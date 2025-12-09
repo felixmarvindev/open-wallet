@@ -2,6 +2,7 @@ package com.openwallet.wallet.service;
 
 import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.domain.Wallet;
+import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.repository.WalletRepository;
 import org.junit.jupiter.api.Test;
@@ -47,5 +48,23 @@ class WalletServiceCacheTest {
                 .forClass(BalanceCacheService.BalanceSnapshot.class);
         verify(balanceCacheService).putBalance(org.mockito.Mockito.eq(1L), captor.capture());
         assertThat(captor.getValue().getBalance()).isEqualTo("10");
+    }
+
+    @Test
+    void getWalletBalanceCachesWhenCacheMiss() {
+        Wallet wallet = Wallet.builder()
+                .id(2L)
+                .customerId(11L)
+                .currency("USD")
+                .balance(new BigDecimal("20.00"))
+                .build();
+        when(balanceCacheService.getBalance(2L)).thenReturn(Optional.empty());
+        when(walletRepository.findByCustomerIdAndId(11L, 2L)).thenReturn(Optional.of(wallet));
+
+        BalanceResponse response = walletService.getWalletBalance(2L, 11L);
+
+        assertThat(response.getBalance()).isEqualByComparingTo(new BigDecimal("20.00"));
+        verify(balanceCacheService).putBalance(org.mockito.Mockito.eq(2L),
+                org.mockito.Mockito.any(BalanceCacheService.BalanceSnapshot.class));
     }
 }

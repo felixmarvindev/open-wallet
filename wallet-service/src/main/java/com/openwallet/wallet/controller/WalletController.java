@@ -42,6 +42,13 @@ public class WalletController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}/balance")
+    public ResponseEntity<com.openwallet.wallet.dto.BalanceResponse> getWalletBalance(
+            @PathVariable("id") Long walletId,
+            @RequestHeader("X-Customer-Id") Long customerId) {
+        return ResponseEntity.ok(walletService.getWalletBalance(walletId, customerId));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<List<WalletResponse>> getMyWallets(
             @RequestHeader("X-Customer-Id") Long customerId

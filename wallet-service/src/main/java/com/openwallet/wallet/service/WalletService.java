@@ -3,6 +3,7 @@ package com.openwallet.wallet.service;
 import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.cache.BalanceCacheService.BalanceSnapshot;
 import com.openwallet.wallet.domain.Wallet;
+import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.exception.WalletAlreadyExistsException;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -72,6 +74,28 @@ public class WalletService {
                     return response;
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public BalanceResponse getWalletBalance(Long walletId, Long customerId) {
+        return balanceCacheService.getBalance(walletId)
+                .map(snapshot -> BalanceResponse.builder()
+                        .balance(new BigDecimal(snapshot.getBalance()))
+                        .currency(snapshot.getCurrency())
+                        .lastUpdated(snapshot.getUpdatedAt())
+                        .build())
+                .orElseGet(() -> walletRepository.findByCustomerIdAndId(customerId, walletId)
+                        .map(wallet -> {
+                            BalanceResponse response = BalanceResponse.builder()
+                                    .balance(wallet.getBalance())
+                                    .currency(wallet.getCurrency())
+                                    .lastUpdated(wallet.getUpdatedAt() != null ? wallet.getUpdatedAt().toString()
+                                            : LocalDateTime.now().toString())
+                                    .build();
+                            cacheBalance(wallet, toResponse(wallet));
+                            return response;
+                        })
+                        .orElseThrow(() -> new WalletNotFoundException("Wallet not found")));
     }
 
     private WalletResponse toResponse(Wallet wallet) {

@@ -88,6 +88,22 @@ class WalletControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/wallets/{id}/balance returns 200 when owned")
+    void getWalletBalanceShouldReturnOk() throws Exception {
+        com.openwallet.wallet.dto.BalanceResponse balance = com.openwallet.wallet.dto.BalanceResponse.builder()
+                .balance(new BigDecimal("10.00"))
+                .currency("KES")
+                .lastUpdated("2024-01-01T00:00:00")
+                .build();
+        Mockito.when(walletService.getWalletBalance(5L, 10L)).thenReturn(balance);
+
+        mockMvc.perform(get("/api/v1/wallets/5/balance")
+                        .header("X-Customer-Id", "10"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(balance)));
+    }
+
+    @Test
     @DisplayName("GET /api/v1/wallets/me returns list")
     void getMyWalletsShouldReturnList() throws Exception {
         List<WalletResponse> responses = Arrays.asList(
