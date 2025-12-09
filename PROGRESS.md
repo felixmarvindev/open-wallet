@@ -347,6 +347,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 1. **Phase 2, Task 5**: Create basic DTOs for all services
 2. **Phase 3**: Start implementing core business logic and APIs (wallet + ledger)
 3. Add integration tests for API flows as endpoints are built
+4. Future cleanup: extract shared event DTOs (e.g., KycEvent, TransactionEvent) into a shared module to remove cross-service duplication
 
 ---
 
