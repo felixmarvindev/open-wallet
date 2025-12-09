@@ -134,11 +134,11 @@ This document tracks the implementation progress against the 8-hour execution pl
 ## Phase 3: Wallet & Ledger Flows (Hour 3.0 – 4.5) ⏳ PENDING
 
 ### ⏳ Task 1: Implement Wallet Service Core APIs
-- [ ] Implement `POST /wallets` - Create wallet
-- [ ] Implement `GET /wallets/{id}` - Get wallet
-- [ ] Implement `GET /wallets/me` - Get user's wallets
-- [ ] Add service layer with business logic
-- [ ] Add validation and error handling
+- [x] Implement `POST /wallets` - Create wallet
+- [x] Implement `GET /wallets/{id}` - Get wallet
+- [x] Implement `GET /wallets/me` - Get user's wallets
+- [x] Add service layer with business logic
+- [x] Add validation and error handling
 
 ### ⏳ Task 2: Implement Ledger Service Core APIs
 - [ ] Implement `POST /transactions/deposits` - Deposit
