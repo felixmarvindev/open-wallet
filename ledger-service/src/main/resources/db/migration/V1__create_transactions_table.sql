@@ -32,3 +32,4 @@ CREATE INDEX idx_transactions_customer_lookup ON transactions(from_wallet_id, to
 -- Add comment to table
 COMMENT ON TABLE transactions IS 'Transaction records for deposits, withdrawals, and transfers';
 
+

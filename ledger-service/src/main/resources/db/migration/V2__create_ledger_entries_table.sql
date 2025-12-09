@@ -20,3 +20,4 @@ CREATE INDEX idx_ledger_created_at ON ledger_entries(created_at DESC);
 -- Add comment to table
 COMMENT ON TABLE ledger_entries IS 'Double-entry ledger records for all financial transactions';
 
+

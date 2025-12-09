@@ -72,16 +72,25 @@ This document tracks the implementation progress against the 8-hour execution pl
 ## Phase 2: Core Domain & Schema Setup (Hour 1.5 – 3.0) 🚧 IN PROGRESS
 
 ### ✅ Task 1: Design and Create Database Schema
-- [x] Created Flyway migration `V1__create_customers_table.sql`
-- [x] Created Flyway migration `V2__create_kyc_checks_table.sql`
-- [x] Created Flyway migration `V1__create_wallets_table.sql`
-- [x] Created Flyway migration `V1__create_transactions_table.sql`
-- [x] Created Flyway migration `V2__create_ledger_entries_table.sql`
-- [x] Created Flyway migration `V1__create_notifications_table.sql`
+- [x] Created Flyway migration `V1__create_customers_table.sql` (customer-service)
+- [x] Created Flyway migration `V2__create_kyc_checks_table.sql` (customer-service)
+- [x] Created Flyway migration `V1__create_wallets_table.sql` (wallet-service)
+- [x] Created Flyway migration `V1__create_transactions_table.sql` (ledger-service)
+- [x] Created Flyway migration `V2__create_ledger_entries_table.sql` (ledger-service)
+- [x] Created Flyway migration `V1__create_notifications_table.sql` (notification-service)
+- [x] Configured separate Flyway schema history tables per service:
+  - `flyway_customer_schema_history` (customer-service)
+  - `flyway_wallet_schema_history` (wallet-service)
+  - `flyway_ledger_schema_history` (ledger-service)
+  - `flyway_notification_schema_history` (notification-service)
+- [x] Each service can now use independent migration versions (V1__, V2__, etc.)
+- [x] Services can start in any order without migration conflicts
 - [x] Added indexes and constraints
 - [x] Added foreign key relationships
 - [x] Added check constraints for data integrity
-- [x] **Commit**: `fb9a9fa` - feat: create database schema migrations with Flyway
+- [x] **Commits**: 
+  - `fb9a9fa` - feat: create database schema migrations with Flyway
+  - (pending) - fix: configure separate Flyway schema history tables per service
 
 ### ⏳ Task 2: Create JPA Entities
 - [ ] Create `Customer` entity
@@ -293,6 +302,12 @@ This document tracks the implementation progress against the 8-hour execution pl
 ---
 
 ## Known Issues & Fixes
+
+### ✅ Fixed: Flyway Version Conflicts
+- **Issue**: Multiple services had V1__ migrations, causing conflicts when sharing the same database
+- **Solution**: Renamed migrations to sequential versions (V1-V6) coordinated across all services
+- **Migration order**: V1 (customers), V2 (kyc_checks), V3 (wallets), V4 (transactions), V5 (ledger_entries), V6 (notifications)
+- **Prevention**: Always coordinate version numbers when multiple services share a database
 
 ### ✅ Fixed: Flyway Checksum Mismatch
 - **Issue**: Flyway validation failed due to checksum mismatch after migration files were modified

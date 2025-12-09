@@ -18,3 +18,4 @@ CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
 -- Add comment to table
 COMMENT ON TABLE notifications IS 'Notification history for audit and tracking';
 
+

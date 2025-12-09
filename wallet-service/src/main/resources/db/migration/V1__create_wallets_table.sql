@@ -20,3 +20,4 @@ CREATE INDEX idx_wallets_currency ON wallets(currency);
 -- Add comment to table
 COMMENT ON TABLE wallets IS 'Customer wallets with balance and transaction limits';
 
+

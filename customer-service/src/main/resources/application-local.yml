@@ -15,6 +15,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    table: flyway_customer_schema_history
 
 kafka:
   bootstrap-servers: localhost:9092
