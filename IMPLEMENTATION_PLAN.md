@@ -995,6 +995,9 @@ wallet-service/src/main/java/com/openwallet/wallet/
    - Test deposit flow end-to-end
    - Test transfer flow
    - Verify double-entry balances
+   - **Testing Approach**: Use `@SpringBootTest` with test containers or embedded databases
+   - **Priority**: Focus on critical business logic (double-entry accounting, transaction flows)
+   - **Coverage**: Integration tests for happy paths and key error scenarios
 
 **Deliverables:**
 
@@ -1034,6 +1037,8 @@ wallet-service/src/main/java/com/openwallet/wallet/
 4. Add basic tests
    - Test KYC initiation and webhook callback
    - Test notification sending on transaction events
+   - **Testing Approach**: Integration tests for KYC state machine and Kafka event consumption
+   - **Coverage**: Verify state transitions and event-driven flows work correctly
 
 **Deliverables:**
 
@@ -1163,6 +1168,7 @@ wallet-service/src/main/java/com/openwallet/wallet/
 
    - **Impact**: Medium - Unit tests and basic integration tests are sufficient
    - **Alternative**: Focus on critical paths (transactions, wallet operations)
+   - **Testing Strategy**: Start writing tests in Phase 3 after core business logic is implemented. Focus on integration tests for critical flows (deposits, transfers, double-entry balances) rather than comprehensive unit test coverage. Add unit tests in Phase 5 for complex business logic.
 
 4. **Advanced Observability (Distributed Tracing)**
 
