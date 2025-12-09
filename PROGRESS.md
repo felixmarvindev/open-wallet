@@ -120,14 +120,14 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Flyway configuration added (already done)
 - [x] Test entity persistence via `@DataJpaTest` (H2 with auditing enabled)
 
-### ⏳ Task 5: Create Basic DTOs
-- [ ] Create DTOs for Customer Service
-- [ ] Create DTOs for Wallet Service
-- [ ] Create DTOs for Ledger Service
-- [ ] Create DTOs for Notification Service
-- [ ] Create DTOs for Auth Service
+### ✅ Task 5: Create Basic DTOs
+- [x] Create DTOs for Customer Service
+- [x] Create DTOs for Wallet Service
+- [x] Create DTOs for Ledger Service
+- [x] Create DTOs for Notification Service
+- [x] Create DTOs for Auth Service
 
-**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations, JPA entities, repositories, and entity persistence tests complete; DTOs pending.
+**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations, JPA entities, repositories, entity persistence tests, and DTOs complete.
 
 ---
 
