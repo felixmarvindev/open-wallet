@@ -182,11 +182,11 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Add service layer and exception handler
 
 ### ⏳ Task 2: Implement KYC Flow
-- [ ] Implement `POST /customers/me/kyc/initiate` - Initiate KYC
-- [ ] Implement `GET /customers/me/kyc/status` - Get status
-- [ ] Implement `POST /customers/kyc/webhook` - Webhook handler
-- [ ] Add KYC status state machine
-- [ ] Publish Kafka events: `KYC_INITIATED`, `KYC_VERIFIED`, `KYC_REJECTED`
+- [x] Implement `POST /customers/me/kyc/initiate` - Initiate KYC
+- [x] Implement `GET /customers/me/kyc/status` - Get status
+- [x] Implement `POST /customers/kyc/webhook` - Webhook handler
+- [x] Add KYC status state machine
+- [x] Publish Kafka events: `KYC_INITIATED`, `KYC_VERIFIED`, `KYC_REJECTED`
 
 ### ⏳ Task 3: Implement Notification Service
 - [ ] Create Kafka consumers for transaction and KYC events
@@ -196,7 +196,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ### ⏳ Task 4: Add Basic Tests
 - [x] Add customer profile controller tests (GET/PUT /customers/me)
-- [ ] Test KYC initiation and webhook callback
+- [x] Test KYC initiation and webhook callback
 - [ ] Test notification sending on transaction events
 
 **Phase 4 Status**: ⏳ **PENDING**

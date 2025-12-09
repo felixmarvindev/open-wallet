@@ -37,6 +37,13 @@ public class CustomerExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, message, request);
     }
 
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    @ResponseBody
+    public ResponseEntity<ApiError> handleBadRequest(RuntimeException ex,
+                                                     HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {
         ApiError error = new ApiError(
                 Instant.now(),
