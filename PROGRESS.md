@@ -174,6 +174,8 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ## Phase 4: KYC & Notifications (Hour 4.5 – 6.0) ⏳ PENDING
 
+**Planning Status**: Task overview and implementation approach drafted (this document). Implementation remains pending until testing and coding steps begin.
+
 ### ⏳ Task 1: Implement Customer Service APIs
 - [ ] Implement `GET /customers/me` - Get profile
 - [ ] Implement `PUT /customers/me` - Update profile
