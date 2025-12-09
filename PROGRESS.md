@@ -189,15 +189,15 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Publish Kafka events: `KYC_INITIATED`, `KYC_VERIFIED`, `KYC_REJECTED`
 
 ### ⏳ Task 3: Implement Notification Service
-- [ ] Create Kafka consumers for transaction and KYC events
-- [ ] Implement SMS provider (logging simulation)
-- [ ] Implement Email provider (logging simulation)
-- [ ] Add notification history
+- [x] Create Kafka consumers for transaction and KYC events
+- [x] Implement SMS provider (logging simulation)
+- [x] Implement Email provider (logging simulation)
+- [x] Add notification history
 
 ### ⏳ Task 4: Add Basic Tests
 - [x] Add customer profile controller tests (GET/PUT /customers/me)
 - [x] Test KYC initiation and webhook callback
-- [ ] Test notification sending on transaction events
+- [x] Test notification sending on transaction events
 
 **Phase 4 Status**: ⏳ **PENDING**
 
