@@ -203,13 +203,20 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ---
 
-## Phase 5: Hardening & DevSecOps (Hour 6.0 – 7.0) ⏳ PENDING
+## Phase 5: Hardening & DevSecOps (Hour 6.0 – 7.0) 🚧 IN PROGRESS
 
-### ⏳ Task 1: Add Security and Authentication
-- [ ] Configure Keycloak integration (or Spring Security with JWT)
-- [ ] Add JWT validation filter/interceptor to all services
-- [ ] Add `@PreAuthorize` annotations for RBAC
-- [ ] Test with different user roles
+### ✅ Task 1: Add Security and Authentication
+- [x] Configure Keycloak integration with OAuth2 Resource Server
+- [x] Add JWT validation via SecurityConfig in all services (wallet, customer, ledger, notification, auth)
+- [x] Create JwtAuthenticationConverter to map Keycloak realm roles to Spring Security authorities
+- [x] Create JwtUtils utility to extract userId from JWT claims
+- [x] Add `@PreAuthorize("hasRole('USER')")` annotations to all controller endpoints
+- [x] Update exception handlers to handle AuthenticationException (401) and AccessDeniedException (403)
+- [x] Create customer-user mapping infrastructure (table, entity, repository, service)
+- [x] Implement customerId resolution from JWT userId in wallet service
+- [x] Update tests to work with JWT authentication using spring-security-test
+- [x] Add IllegalArgumentException handler for mapping resolution errors
+- [x] Maintain backward compatibility with X-User-Id and X-Customer-Id headers for tests
 
 ### ⏳ Task 2: Add Comprehensive Validation
 - [ ] Add Bean Validation annotations to all DTOs
@@ -236,7 +243,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [ ] Test building images
 - [ ] Update Docker Compose to use built images
 
-**Phase 5 Status**: ⏳ **PENDING**
+**Phase 5 Status**: 🚧 **IN PROGRESS** - Task 1 (Security & Authentication) complete. Remaining tasks: validation, resilience, observability, CI/CD, Dockerfiles.
 
 ---
 
@@ -359,7 +366,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 | Phase 2 | 1.5 hours | In progress | 🚧 80% complete |
 | Phase 3 | 1.5 hours | - | ⏳ Pending |
 | Phase 4 | 1.5 hours | - | ⏳ Pending |
-| Phase 5 | 1.0 hours | - | ⏳ Pending |
+| Phase 5 | 1.0 hours | In progress | 🚧 Task 1 complete |
 | Phase 6 | 1.0 hours | - | ⏳ Pending |
 | **Total** | **8.0 hours** | **~2.4 hours** | **40% complete** |
 
@@ -368,6 +375,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 ## Git Commit History
 
 ```
+(pending) - feat(phase5): implement JWT-based security and authentication
 (pending) - feat: add JPA repositories for all services
 (pending) - test: add JPA entity persistence tests with H2 auditing and JSON handling
 (pending) - feat: create JPA entities with relationships and audit fields

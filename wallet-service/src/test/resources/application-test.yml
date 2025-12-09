@@ -15,6 +15,12 @@ spring:
   flyway:
     enabled: false
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/openwallet
+
 logging:
   level:
     org.hibernate.SQL: DEBUG

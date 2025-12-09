@@ -55,8 +55,15 @@ public class WalletExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseBody
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex,
-                                                       HttpServletRequest request) {
+            HttpServletRequest request) {
         return build(HttpStatus.FORBIDDEN, "Access denied: " + ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseBody
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,
+            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {
