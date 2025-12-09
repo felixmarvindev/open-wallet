@@ -11,9 +11,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Arrays;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -22,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
 @SuppressWarnings("null")
@@ -55,7 +60,12 @@ class CustomerControllerTest {
                 .build());
 
         mockMvc.perform(get("/api/v1/customers/me")
-                .header("X-User-Id", "user-123"))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                        .jwt(jwt -> jwt.subject("user-123")
+                                                        .claim("realm_access",
+                                                                        Collections.singletonMap("roles",
+                                                                                        Arrays.asList("USER"))))
+                                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(customer.getId()))
                 .andExpect(jsonPath("$.firstName").value("John"))
@@ -84,9 +94,14 @@ class CustomerControllerTest {
                 .build();
 
         mockMvc.perform(put("/api/v1/customers/me")
-                .header("X-User-Id", "user-456")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                        .jwt(jwt -> jwt.subject("user-456")
+                                                        .claim("realm_access",
+                                                                        Collections.singletonMap("roles",
+                                                                                        Arrays.asList("USER"))))
+                                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Janet"))
                 .andExpect(jsonPath("$.lastName").value("Smithers"))
@@ -106,7 +121,12 @@ class CustomerControllerTest {
     @Test
     void getMyProfileReturns404WhenMissing() throws Exception {
         mockMvc.perform(get("/api/v1/customers/me")
-                .header("X-User-Id", "missing-user"))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                        .jwt(jwt -> jwt.subject("missing-user")
+                                                        .claim("realm_access",
+                                                                        Collections.singletonMap("roles",
+                                                                                        Arrays.asList("USER"))))
+                                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isNotFound());
     }
 
@@ -121,9 +141,14 @@ class CustomerControllerTest {
                 .build();
 
         mockMvc.perform(put("/api/v1/customers/me")
-                .header("X-User-Id", "user-789")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalid)))
+                        .content(objectMapper.writeValueAsString(invalid))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                        .jwt(jwt -> jwt.subject("user-789")
+                                                        .claim("realm_access",
+                                                                        Collections.singletonMap("roles",
+                                                                                        Arrays.asList("USER"))))
+                                        .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isBadRequest());
     }
 }
