@@ -160,6 +160,9 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Invalidate cache on transaction completion
 - [x] Add distributed lock for concurrent operations
 
+### ⏳ Task 6: Balance Endpoint
+- [x] Add `GET /wallets/{id}/balance` with cache read-through
+
 ### ⏳ Task 5: Add Basic Integration Tests
 - [ ] Test deposit flow end-to-end
 - [ ] Test transfer flow
