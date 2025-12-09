@@ -158,7 +158,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Create `BalanceCacheService` in Wallet Service
 - [x] Cache balance on wallet read
 - [x] Invalidate cache on transaction completion
-- [ ] Add distributed lock for concurrent operations
+- [x] Add distributed lock for concurrent operations
 
 ### ⏳ Task 5: Add Basic Integration Tests
 - [ ] Test deposit flow end-to-end
