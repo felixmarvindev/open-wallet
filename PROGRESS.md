@@ -108,12 +108,12 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Configure proper JPA relationships with cascade options
 
 ### ⏳ Task 3: Create JPA Repositories
-- [ ] Create `CustomerRepository`
-- [ ] Create `KycCheckRepository`
-- [ ] Create `WalletRepository`
-- [ ] Create `TransactionRepository`
-- [ ] Create `LedgerEntryRepository`
-- [ ] Add custom query methods where needed
+- [x] Create `CustomerRepository`
+- [x] Create `KycCheckRepository`
+- [x] Create `WalletRepository`
+- [x] Create `TransactionRepository`
+- [x] Create `LedgerEntryRepository`
+- [x] Add custom query methods where needed
 
 ### ⏳ Task 4: Add Database Configuration
 - [x] JPA/Hibernate configured in `application.yml` (already done)
@@ -127,7 +127,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [ ] Create DTOs for Notification Service
 - [ ] Create DTOs for Auth Service
 
-**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations and JPA entities complete; entity persistence tests added; repositories and DTOs pending.
+**Phase 2 Status**: 🚧 **IN PROGRESS** - Schema migrations, JPA entities, repositories, and entity persistence tests complete; DTOs pending.
 
 ---
 
@@ -338,10 +338,9 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ## Next Steps
 
-1. **Phase 2, Task 3**: Create JPA repositories for all entities
-2. **Phase 2, Task 5**: Create basic DTOs for all services
-3. **Phase 3**: Start implementing core business logic and APIs (wallet + ledger)
-4. Add integration tests for API flows as endpoints are built
+1. **Phase 2, Task 5**: Create basic DTOs for all services
+2. **Phase 3**: Start implementing core business logic and APIs (wallet + ledger)
+3. Add integration tests for API flows as endpoints are built
 
 ---
 
@@ -350,18 +349,19 @@ This document tracks the implementation progress against the 8-hour execution pl
 | Phase | Estimated Time | Actual Time | Status |
 |-------|---------------|-------------|--------|
 | Phase 1 | 1.5 hours | ~1.5 hours | ✅ Complete |
-| Phase 2 | 1.5 hours | In progress | 🚧 70% complete |
+| Phase 2 | 1.5 hours | In progress | 🚧 80% complete |
 | Phase 3 | 1.5 hours | - | ⏳ Pending |
 | Phase 4 | 1.5 hours | - | ⏳ Pending |
 | Phase 5 | 1.0 hours | - | ⏳ Pending |
 | Phase 6 | 1.0 hours | - | ⏳ Pending |
-| **Total** | **8.0 hours** | **~2.2 hours** | **35% complete** |
+| **Total** | **8.0 hours** | **~2.4 hours** | **40% complete** |
 
 ---
 
 ## Git Commit History
 
 ```
+(pending) - feat: add JPA repositories for all services
 (pending) - test: add JPA entity persistence tests with H2 auditing and JSON handling
 (pending) - feat: create JPA entities with relationships and audit fields
 fb9a9fa - feat: create database schema migrations with Flyway
