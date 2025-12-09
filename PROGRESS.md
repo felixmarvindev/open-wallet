@@ -141,12 +141,12 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Add validation and error handling
 
 ### ⏳ Task 2: Implement Ledger Service Core APIs
-- [ ] Implement `POST /transactions/deposits` - Deposit
-- [ ] Implement `POST /transactions/withdrawals` - Withdrawal
-- [ ] Implement `POST /transactions/transfers` - Transfer
-- [ ] Implement double-entry logic in service layer
-- [ ] Add transaction status management
-- [ ] Add idempotency key handling
+- [x] Implement `POST /transactions/deposits` - Deposit
+- [x] Implement `POST /transactions/withdrawals` - Withdrawal
+- [x] Implement `POST /transactions/transfers` - Transfer
+- [x] Implement double-entry logic in service layer
+- [x] Add transaction status management
+- [x] Add idempotency key handling
 
 ### ⏳ Task 3: Wire Kafka for Transaction Events
 - [ ] Create Kafka producer in Ledger Service
