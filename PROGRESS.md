@@ -294,6 +294,13 @@ This document tracks the implementation progress against the 8-hour execution pl
 
 ## Known Issues & Fixes
 
+### ✅ Fixed: Flyway Checksum Mismatch
+- **Issue**: Flyway validation failed due to checksum mismatch after migration files were modified
+- **Solution**: Reset database (drop volume and recreate) to get clean migration state
+- **Prevention**: Don't modify migration files after they've been applied. Create new migrations instead.
+- **When it happens**: After modifying a migration file that was already run
+- **Quick fix**: `docker-compose down -v` (removes volumes) then `docker-compose up -d postgres`
+
 ### ✅ Fixed: PostgreSQL Port Conflict
 - **Issue**: Local Windows PostgreSQL was using port 5432
 - **Solution**: Changed Docker PostgreSQL to port 5433
