@@ -177,9 +177,9 @@ This document tracks the implementation progress against the 8-hour execution pl
 **Planning Status**: Task overview and implementation approach drafted (this document). Implementation remains pending until testing and coding steps begin.
 
 ### ⏳ Task 1: Implement Customer Service APIs
-- [ ] Implement `GET /customers/me` - Get profile
-- [ ] Implement `PUT /customers/me` - Update profile
-- [ ] Add service layer
+- [x] Implement `GET /customers/me` - Get profile
+- [x] Implement `PUT /customers/me` - Update profile
+- [x] Add service layer and exception handler
 
 ### ⏳ Task 2: Implement KYC Flow
 - [ ] Implement `POST /customers/me/kyc/initiate` - Initiate KYC
@@ -195,6 +195,7 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [ ] Add notification history
 
 ### ⏳ Task 4: Add Basic Tests
+- [x] Add customer profile controller tests (GET/PUT /customers/me)
 - [ ] Test KYC initiation and webhook callback
 - [ ] Test notification sending on transaction events
 
