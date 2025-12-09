@@ -149,15 +149,15 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Add idempotency key handling
 
 ### ⏳ Task 3: Wire Kafka for Transaction Events
-- [ ] Create Kafka producer in Ledger Service
-- [ ] Publish `TRANSACTION_INITIATED`, `TRANSACTION_COMPLETED`, `TRANSACTION_FAILED`
-- [ ] Create Kafka consumer in Wallet Service
-- [ ] Update Redis balance cache on `TRANSACTION_COMPLETED`
+- [x] Create Kafka producer in Ledger Service
+- [x] Publish `TRANSACTION_INITIATED`, `TRANSACTION_COMPLETED`, `TRANSACTION_FAILED`
+- [x] Create Kafka consumer in Wallet Service
+- [x] Update Redis balance cache on `TRANSACTION_COMPLETED`
 
 ### ⏳ Task 4: Add Redis Balance Caching
-- [ ] Create `BalanceCacheService` in Wallet Service
-- [ ] Cache balance on wallet read
-- [ ] Invalidate cache on transaction completion
+- [x] Create `BalanceCacheService` in Wallet Service
+- [x] Cache balance on wallet read
+- [x] Invalidate cache on transaction completion
 - [ ] Add distributed lock for concurrent operations
 
 ### ⏳ Task 5: Add Basic Integration Tests

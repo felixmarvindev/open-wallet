@@ -1,5 +1,7 @@
 package com.openwallet.wallet.service;
 
+import com.openwallet.wallet.cache.BalanceCacheService;
+import com.openwallet.wallet.cache.BalanceCacheService.BalanceSnapshot;
 import com.openwallet.wallet.domain.Wallet;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.WalletResponse;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
 public class WalletService {
 
     private final WalletRepository walletRepository;
+    private final BalanceCacheService balanceCacheService;
 
     @Transactional
     public WalletResponse createWallet(Long customerId, CreateWalletRequest request) {
@@ -51,7 +54,11 @@ public class WalletService {
     @Transactional(readOnly = true)
     public WalletResponse getWallet(Long walletId, Long customerId) {
         return walletRepository.findByCustomerIdAndId(customerId, walletId)
-                .map(this::toResponse)
+                .map(wallet -> {
+                    WalletResponse response = toResponse(wallet);
+                    cacheBalance(wallet, response);
+                    return response;
+                })
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
     }
 
@@ -59,7 +66,11 @@ public class WalletService {
     public List<WalletResponse> getMyWallets(Long customerId) {
         return walletRepository.findByCustomerId(customerId)
                 .stream()
-                .map(this::toResponse)
+                .map(wallet -> {
+                    WalletResponse response = toResponse(wallet);
+                    cacheBalance(wallet, response);
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -79,6 +90,14 @@ public class WalletService {
 
     private BigDecimal defaultLimit(BigDecimal provided, BigDecimal fallback) {
         return provided != null ? provided : fallback;
+    }
+
+    private void cacheBalance(Wallet wallet, WalletResponse response) {
+        BalanceSnapshot snapshot = new BalanceSnapshot(
+                response.getBalance().toPlainString(),
+                response.getCurrency(),
+                response.getUpdatedAt() != null ? response.getUpdatedAt().toString() : null);
+        balanceCacheService.putBalance(wallet.getId(), snapshot);
     }
 }
 
