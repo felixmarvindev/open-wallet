@@ -164,9 +164,9 @@ This document tracks the implementation progress against the 8-hour execution pl
 - [x] Add `GET /wallets/{id}/balance` with cache read-through
 
 ### ⏳ Task 5: Add Basic Integration Tests
-- [ ] Test deposit flow end-to-end
-- [ ] Test transfer flow
-- [ ] Verify double-entry balances
+- [x] Test deposit flow end-to-end
+- [x] Test transfer flow
+- [x] Verify double-entry balances
 
 **Phase 3 Status**: ⏳ **PENDING**
 
