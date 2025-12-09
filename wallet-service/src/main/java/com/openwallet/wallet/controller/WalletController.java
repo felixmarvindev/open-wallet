@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,6 +26,7 @@ public class WalletController {
     private final WalletService walletService;
 
     @PostMapping
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<WalletResponse> createWallet(
             @RequestHeader("X-Customer-Id") Long customerId,
             @Valid @RequestBody CreateWalletRequest request
@@ -34,6 +36,7 @@ public class WalletController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<WalletResponse> getWallet(
             @PathVariable("id") Long walletId,
             @RequestHeader("X-Customer-Id") Long customerId
@@ -43,6 +46,7 @@ public class WalletController {
     }
 
     @GetMapping("/{id}/balance")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<com.openwallet.wallet.dto.BalanceResponse> getWalletBalance(
             @PathVariable("id") Long walletId,
             @RequestHeader("X-Customer-Id") Long customerId) {
@@ -50,6 +54,7 @@ public class WalletController {
     }
 
     @GetMapping("/me")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<WalletResponse>> getMyWallets(
             @RequestHeader("X-Customer-Id") Long customerId
     ) {
