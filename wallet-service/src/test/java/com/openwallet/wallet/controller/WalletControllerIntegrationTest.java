@@ -60,7 +60,7 @@ class WalletControllerIntegrationTest {
     @Test
     void createWalletShouldResolveCustomerIdFromJWT() throws Exception {
         // Given: Mapping exists for userId
-        CustomerUserMapping mapping = mappingRepository.save(CustomerUserMapping.builder()
+        mappingRepository.save(CustomerUserMapping.builder()
                 .userId("wallet-user-1")
                 .customerId(100L)
                 .build());
@@ -90,7 +90,7 @@ class WalletControllerIntegrationTest {
     @Test
     void createWalletShouldValidateHeaderMatchesJWT() throws Exception {
         // Given: Mapping exists
-        CustomerUserMapping mapping = mappingRepository.save(CustomerUserMapping.builder()
+        mappingRepository.save(CustomerUserMapping.builder()
                 .userId("wallet-user-2")
                 .customerId(200L)
                 .build());
@@ -116,7 +116,7 @@ class WalletControllerIntegrationTest {
     @Test
     void getWalletShouldResolveCustomerIdFromJWT() throws Exception {
         // Given: Mapping and wallet exist
-        CustomerUserMapping mapping = mappingRepository.save(CustomerUserMapping.builder()
+        mappingRepository.save(CustomerUserMapping.builder()
                 .userId("wallet-user-3")
                 .customerId(300L)
                 .build());
@@ -145,7 +145,7 @@ class WalletControllerIntegrationTest {
     @Test
     void getMyWalletsShouldResolveCustomerIdFromJWT() throws Exception {
         // Given: Mapping and wallets exist
-        CustomerUserMapping mapping = mappingRepository.save(CustomerUserMapping.builder()
+        mappingRepository.save(CustomerUserMapping.builder()
                 .userId("wallet-user-4")
                 .customerId(400L)
                 .build());

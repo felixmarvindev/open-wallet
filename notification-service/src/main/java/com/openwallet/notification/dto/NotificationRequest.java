@@ -1,5 +1,6 @@
 package com.openwallet.notification.dto;
 
+import com.openwallet.notification.validation.NotificationChannel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -15,16 +16,17 @@ import lombok.Setter;
 @Builder
 public class NotificationRequest {
 
-    @NotBlank
+    @NotBlank(message = "Recipient is required")
     private String recipient;
 
-    @NotBlank
+    @NotBlank(message = "Notification type is required")
     private String notificationType;
 
-    @NotNull
+    @NotNull(message = "Channel is required")
+    @NotificationChannel
     private String channel; // SMS or EMAIL
 
-    @NotBlank
+    @NotBlank(message = "Content is required")
     private String content;
 }
 

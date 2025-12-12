@@ -62,7 +62,7 @@ public class KycService {
     @Transactional
     public KycStatusResponse handleWebhook(KycWebhookRequest request) {
         KycCheck kycCheck = kycCheckRepository.findTopByCustomerIdOrderByCreatedAtDesc(request.getCustomerId())
-                .orElseThrow(() -> new IllegalStateException("No KYC record found for customer"));
+                .orElseThrow(() -> new CustomerNotFoundException("No KYC record found for customer"));
 
         if (kycCheck.getStatus() == KycStatus.VERIFIED || kycCheck.getStatus() == KycStatus.REJECTED) {
             throw new IllegalStateException("KYC already completed");

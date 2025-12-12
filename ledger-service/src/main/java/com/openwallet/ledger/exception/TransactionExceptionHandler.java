@@ -34,11 +34,17 @@ public class TransactionExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseBody
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
-        String message = ex.getBindingResult().getFieldErrors().stream()
+        java.util.List<org.springframework.validation.FieldError> fieldErrors = ex.getBindingResult().getFieldErrors();
+        java.util.List<FieldErrorDetail> details = fieldErrors.stream()
+                .map(error -> new FieldErrorDetail(error.getField(), error.getDefaultMessage()))
+                .collect(java.util.stream.Collectors.toList());
+        
+        String message = fieldErrors.stream()
                 .map(FieldError::getDefaultMessage)
                 .findFirst()
                 .orElse("Validation failed");
-        return build(HttpStatus.BAD_REQUEST, message, request);
+        
+        return build(HttpStatus.BAD_REQUEST, message, request, details);
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -54,12 +60,18 @@ public class TransactionExceptionHandler {
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {
+        return build(status, message, request, null);
+    }
+
+    private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request,
+                                          java.util.List<FieldErrorDetail> details) {
         ApiError error = new ApiError(
                 Instant.now(),
                 status.value(),
                 status.getReasonPhrase(),
                 message,
-                request.getRequestURI());
+                request.getRequestURI(),
+                details);
         return ResponseEntity.status(status).body(error);
     }
 
@@ -69,13 +81,16 @@ public class TransactionExceptionHandler {
         private final String error;
         private final String message;
         private final String path;
+        private final java.util.List<FieldErrorDetail> details;
 
-        public ApiError(Instant timestamp, int status, String error, String message, String path) {
+        public ApiError(Instant timestamp, int status, String error, String message, String path,
+                       java.util.List<FieldErrorDetail> details) {
             this.timestamp = timestamp;
             this.status = status;
             this.error = error;
             this.message = message;
             this.path = path;
+            this.details = details;
         }
 
         public Instant getTimestamp() {
@@ -96,6 +111,28 @@ public class TransactionExceptionHandler {
 
         public String getPath() {
             return path;
+        }
+
+        public java.util.List<FieldErrorDetail> getDetails() {
+            return details;
+        }
+    }
+
+    public static class FieldErrorDetail {
+        private final String field;
+        private final String message;
+
+        public FieldErrorDetail(String field, String message) {
+            this.field = field;
+            this.message = message;
+        }
+
+        public String getField() {
+            return field;
+        }
+
+        public String getMessage() {
+            return message;
         }
     }
 }

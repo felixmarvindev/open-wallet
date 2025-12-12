@@ -1,5 +1,6 @@
 package com.openwallet.customer.dto;
 
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,8 @@ import java.util.Map;
 @Builder
 public class KycInitiateRequest {
 
-    @NotNull
+    @NotNull(message = "Documents are required")
+    @NotEmpty(message = "At least one document must be provided")
     private Map<String, Object> documents;
 }
 

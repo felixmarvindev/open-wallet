@@ -1,9 +1,9 @@
 package com.openwallet.ledger.dto;
 
+import com.openwallet.ledger.validation.CurrencyCode;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,18 +19,18 @@ import java.math.BigDecimal;
 @Builder
 public class DepositRequest {
 
-    @NotNull
+    @NotNull(message = "Wallet ID is required")
     private Long toWalletId;
 
-    @NotNull
+    @NotNull(message = "Amount is required")
     @DecimalMin(value = "0.01", message = "Amount must be greater than 0")
     private BigDecimal amount;
 
-    @NotBlank
-    @Size(min = 3, max = 3)
+    @NotNull(message = "Currency is required")
+    @CurrencyCode
     private String currency;
 
-    @NotBlank
+    @NotBlank(message = "Idempotency key is required")
     private String idempotencyKey;
 }
 

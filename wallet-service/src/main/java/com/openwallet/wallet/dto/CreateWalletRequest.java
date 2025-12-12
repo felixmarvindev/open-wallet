@@ -1,8 +1,8 @@
 package com.openwallet.wallet.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import com.openwallet.wallet.validation.CurrencyCode;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -18,8 +18,8 @@ import java.math.BigDecimal;
 @Builder
 public class CreateWalletRequest {
 
-    @NotBlank
-    @Size(min = 3, max = 3, message = "Currency must be ISO 3-letter code")
+    @NotNull(message = "Currency is required")
+    @CurrencyCode
     private String currency;
 
     @DecimalMin(value = "0.00", message = "Daily limit cannot be negative")
