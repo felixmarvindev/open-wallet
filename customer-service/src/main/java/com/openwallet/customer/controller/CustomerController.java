@@ -1,5 +1,6 @@
 package com.openwallet.customer.controller;
 
+import com.openwallet.customer.dto.CreateCustomerRequest;
 import com.openwallet.customer.dto.CustomerResponse;
 import com.openwallet.customer.dto.KycInitiateRequest;
 import com.openwallet.customer.dto.KycStatusResponse;
@@ -10,6 +11,7 @@ import com.openwallet.customer.service.KycService;
 import com.openwallet.customer.config.JwtUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.access.AccessDeniedException;
@@ -31,6 +33,16 @@ public class CustomerController {
 
     private final CustomerService customerService;
     private final KycService kycService;
+
+    @PostMapping
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<CustomerResponse> createCustomer(
+            @RequestHeader(value = "X-User-Id", required = false) String headerUserId,
+            @Valid @RequestBody CreateCustomerRequest request) {
+        String userId = resolveUserId(headerUserId);
+        CustomerResponse response = customerService.createCustomer(userId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 
     @GetMapping("/me")
     @PreAuthorize("hasRole('USER')")

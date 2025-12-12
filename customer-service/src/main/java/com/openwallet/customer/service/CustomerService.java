@@ -1,7 +1,9 @@
 package com.openwallet.customer.service;
 
 import com.openwallet.customer.domain.Customer;
+import com.openwallet.customer.domain.CustomerStatus;
 import com.openwallet.customer.domain.CustomerUserMapping;
+import com.openwallet.customer.dto.CreateCustomerRequest;
 import com.openwallet.customer.dto.CustomerResponse;
 import com.openwallet.customer.dto.UpdateCustomerRequest;
 import com.openwallet.customer.exception.CustomerNotFoundException;
@@ -24,6 +26,52 @@ public class CustomerService {
         Customer customer = customerRepository.findByUserId(userId)
                 .orElseThrow(() -> new CustomerNotFoundException("Customer not found"));
         return toResponse(customer);
+    }
+
+    /**
+     * Creates a new customer profile for the authenticated user.
+     *
+     * @param userId  Keycloak user ID (from JWT)
+     * @param request Customer creation request
+     * @return Created customer response
+     * @throws IllegalStateException    if customer already exists for this userId
+     * @throws IllegalArgumentException if email or phone number already exists
+     */
+    @Transactional
+    public CustomerResponse createCustomer(String userId, CreateCustomerRequest request) {
+        // Check if customer already exists for this userId
+        if (customerRepository.findByUserId(userId).isPresent()) {
+            throw new IllegalStateException("Customer already exists for this user");
+        }
+
+        // Check if email already exists
+        if (customerRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Customer with email '" + request.getEmail() + "' already exists");
+        }
+
+        // Check if phone number already exists
+        if (customerRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
+            throw new IllegalArgumentException(
+                    "Customer with phone number '" + request.getPhoneNumber() + "' already exists");
+        }
+
+        // Create customer entity
+        Customer customer = Customer.builder()
+                .userId(userId)
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .phoneNumber(request.getPhoneNumber())
+                .email(request.getEmail())
+                .address(request.getAddress())
+                .status(CustomerStatus.ACTIVE)
+                .build();
+
+        Customer saved = customerRepository.save(customer);
+
+        // Ensure mapping exists
+        ensureMappingExists(saved);
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -61,7 +109,7 @@ public class CustomerService {
                 });
         
         // Create mapping if missing
-        if (!mappingRepository.findByCustomerId(customer.getId()).isPresent()) {
+        if (mappingRepository.findByCustomerId(customer.getId()).isEmpty()) {
             CustomerUserMapping mapping = CustomerUserMapping.builder()
                     .userId(customer.getUserId())
                     .customerId(customer.getId())
