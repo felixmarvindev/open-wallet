@@ -19,6 +19,7 @@
         <module>wallet-service</module>
         <module>ledger-service</module>
         <module>notification-service</module>
+        <module>integration-test</module>
     </modules>
 
     <properties>
@@ -33,6 +34,7 @@
         <mapstruct.version>1.5.5.Final</mapstruct.version>
         <junit.version>5.10.0</junit.version>
         <mockito.version>5.6.0</mockito.version>
+        <testcontainers.version>1.19.3</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -79,6 +81,11 @@
             <dependency>
                 <groupId>com.openwallet</groupId>
                 <artifactId>notification-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openwallet</groupId>
+                <artifactId>integration-test</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
