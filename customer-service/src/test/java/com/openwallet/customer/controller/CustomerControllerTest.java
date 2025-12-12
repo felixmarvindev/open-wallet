@@ -3,8 +3,10 @@ package com.openwallet.customer.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openwallet.customer.domain.Customer;
 import com.openwallet.customer.domain.CustomerStatus;
+import com.openwallet.customer.dto.CreateCustomerRequest;
 import com.openwallet.customer.dto.UpdateCustomerRequest;
 import com.openwallet.customer.repository.CustomerRepository;
+import com.openwallet.customer.repository.CustomerUserMappingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,7 @@ import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,9 +45,177 @@ class CustomerControllerTest {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private CustomerUserMappingRepository mappingRepository;
+
     @BeforeEach
     void clean() {
+        mappingRepository.deleteAll();
         customerRepository.deleteAll();
+    }
+
+    @Test
+    void createCustomerShouldReturn201Created() throws Exception {
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("John")
+                .lastName("Doe")
+                .phoneNumber("+254712345678")
+                .email("john.doe@example.com")
+                .address("123 Main St")
+                .build();
+
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("user-new-123")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.userId").value("user-new-123"))
+                .andExpect(jsonPath("$.firstName").value("John"))
+                .andExpect(jsonPath("$.lastName").value("Doe"))
+                .andExpect(jsonPath("$.phoneNumber").value("+254712345678"))
+                .andExpect(jsonPath("$.email").value("john.doe@example.com"))
+                .andExpect(jsonPath("$.address").value("123 Main St"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        // Verify customer was saved
+        Customer saved = customerRepository.findByUserId("user-new-123")
+                .orElseThrow(() -> new IllegalStateException("Customer not found"));
+        assertThat(saved.getFirstName()).isEqualTo("John");
+        assertThat(saved.getEmail()).isEqualTo("john.doe@example.com");
+    }
+
+    @Test
+    void createCustomerShouldCreateMapping() throws Exception {
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("Jane")
+                .lastName("Smith")
+                .phoneNumber("+254798765432")
+                .email("jane.smith@example.com")
+                .address("456 Oak Ave")
+                .build();
+
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("user-mapping-123")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isCreated());
+
+        // Verify mapping was created
+        assertThat(mappingRepository.findByUserId("user-mapping-123")).isPresent();
+        Customer customer = customerRepository.findByUserId("user-mapping-123")
+                .orElseThrow(() -> new IllegalStateException("Customer not found"));
+        assertThat(mappingRepository.findByUserId("user-mapping-123").get().getCustomerId())
+                .isEqualTo(customer.getId());
+    }
+
+    @Test
+    void createCustomerShouldReturn400WhenCustomerAlreadyExists() throws Exception {
+        // Given: Customer already exists
+        customerRepository.save(Customer.builder()
+                .userId("user-duplicate-123")
+                .firstName("Existing")
+                .lastName("User")
+                .phoneNumber("+254711111111")
+                .email("existing@example.com")
+                .status(CustomerStatus.ACTIVE)
+                .build());
+
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("New")
+                .lastName("User")
+                .phoneNumber("+254722222222")
+                .email("new@example.com")
+                .build();
+
+        // When/Then: Should return 400 Bad Request
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("user-duplicate-123")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already exists")));
+    }
+
+    @Test
+    void createCustomerShouldReturn400WhenEmailAlreadyExists() throws Exception {
+        // Given: Customer with email already exists
+        customerRepository.save(Customer.builder()
+                .userId("user-email-123")
+                .firstName("Existing")
+                .lastName("User")
+                .phoneNumber("+254711111111")
+                .email("duplicate@example.com")
+                .status(CustomerStatus.ACTIVE)
+                .build());
+
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("New")
+                .lastName("User")
+                .phoneNumber("+254722222222")
+                .email("duplicate@example.com") // Duplicate email
+                .build();
+
+        // When/Then: Should return 400 Bad Request
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("user-new-email-123")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("email")));
+    }
+
+    @Test
+    void createCustomerShouldReturn400WhenPhoneNumberAlreadyExists() throws Exception {
+        // Given: Customer with phone number already exists
+        customerRepository.save(Customer.builder()
+                .userId("user-phone-123")
+                .firstName("Existing")
+                .lastName("User")
+                .phoneNumber("+254733333333")
+                .email("existing@example.com")
+                .status(CustomerStatus.ACTIVE)
+                .build());
+
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("New")
+                .lastName("User")
+                .phoneNumber("+254733333333") // Duplicate phone
+                .email("new@example.com")
+                .build();
+
+        // When/Then: Should return 400 Bad Request
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("user-new-phone-123")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("phone number")));
     }
 
     @Test

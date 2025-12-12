@@ -1,6 +1,7 @@
 package com.openwallet.customer.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openwallet.customer.dto.CreateCustomerRequest;
 import com.openwallet.customer.dto.KycInitiateRequest;
 import com.openwallet.customer.dto.KycWebhookRequest;
 import com.openwallet.customer.dto.UpdateCustomerRequest;
@@ -40,6 +41,37 @@ class CustomerControllerValidationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Test
+    void createCustomerShouldReturnDetailedValidationErrors() throws Exception {
+        // Given: Invalid create request
+        CreateCustomerRequest request = CreateCustomerRequest.builder()
+                .firstName("") // Blank
+                .lastName("") // Blank
+                .phoneNumber("0123456789") // Invalid format (starts with 0, pattern requires first digit to be 1-9)
+                .email("not-an-email") // Invalid email
+                .address(new String(new char[501]).replace('\0', 'A')) // Too long (501 chars)
+                .build();
+
+        // When: Creating customer
+        mockMvc.perform(post("/api/v1/customers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("test-user")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.details").isArray())
+                .andExpect(jsonPath("$.details.length()").value(org.hamcrest.Matchers.greaterThan(0)))
+                .andExpect(jsonPath("$.details[?(@.field == 'firstName')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'lastName')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'phoneNumber')]").exists())
+                .andExpect(jsonPath("$.details[?(@.field == 'email')]").exists());
+    }
 
     @Test
     void updateCustomerShouldReturnDetailedValidationErrors() throws Exception {
