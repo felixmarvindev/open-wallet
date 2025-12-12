@@ -73,6 +73,11 @@
             <artifactId>keycloak-spring-boot-starter</artifactId>
             <version>23.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>23.0.0</version>
+        </dependency>
 
         <!-- Utilities -->
         <dependency>

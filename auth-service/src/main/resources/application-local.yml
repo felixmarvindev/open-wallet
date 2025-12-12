@@ -39,6 +39,9 @@ keycloak:
   server-url: http://localhost:8080
   realm: openwallet
   client-id: auth-service
+  client-secret: 8hngZZARbVBbrnwgF6KG5KWbsPvWfAez # Set via environment variable or update in production
+  admin-username: admin
+  admin-password: admin
 
 management:
   endpoints:
