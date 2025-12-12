@@ -160,8 +160,14 @@ public class AuthService {
             if (userId != null) {
                 // Logout user in Keycloak
                 keycloakService.logoutUser(userId);
-
-                // Publish USER_LOGOUT event
+                log.info("User logged out successfully: userId={}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("User logout failed: userId={}, error={}", userId, e.getMessage());
+            // Don't throw exception - logout is best effort
+        } finally {
+            // Always publish logout event for audit trail, even if Keycloak logout failed
+            if (userId != null) {
                 UserEvent event = UserEvent.builder()
                         .userId(userId)
                         .eventType("USER_LOGOUT")
@@ -170,19 +176,11 @@ public class AuthService {
                         .build();
                 userEventProducer.publish(event);
             }
-
-            log.info("User logged out successfully: userId={}", userId);
-
-            return LogoutResponse.builder()
-                    .message("User logged out successfully")
-                    .build();
-        } catch (Exception e) {
-            log.warn("User logout failed: userId={}, error={}", userId, e.getMessage());
-            // Don't throw exception - logout is best effort
-            return LogoutResponse.builder()
-                    .message("Logout completed")
-                    .build();
         }
+
+        return LogoutResponse.builder()
+                .message("User logged out successfully")
+                .build();
     }
 
 

@@ -53,7 +53,7 @@ public class AuthController {
      * Refresh an access token using a refresh token.
      *
      * @param request Refresh request with refresh token
-     * @return Refresh response with new access token
+     * @return Refresh response with a new access token
      */
     @PostMapping("/refresh")
     public ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
@@ -63,9 +63,9 @@ public class AuthController {
     }
 
     /**
-     * Logout a user.
-     * Note: In production, userId should be extracted from JWT token.
-     * For now, this endpoint accepts logout request with refresh token.
+     * Log out a user.
+     * Note: In production, userId should be extracted from a JWT token.
+     * For now, this endpoint accepts a logout request with a refresh token.
      *
      * @param request Logout request
      * @return Logout response

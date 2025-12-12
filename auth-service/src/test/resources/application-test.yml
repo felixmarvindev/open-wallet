@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+
+kafka:
+  bootstrap-servers: localhost:9092
+
+keycloak:
+  server-url: http://localhost:8080
+  realm: openwallet
+  client-id: auth-service
+  client-secret: test-secret
+  admin-username: admin
+  admin-password: admin
+
+app:
+  topics:
+    user-events: user-events
+
