@@ -131,3 +131,4 @@ Error: Container startup timeout
 - Kafka topics are created automatically
 - Keycloak realm must be configured manually (see `docs/KEYCLOAK_SETUP.md`)
 
+

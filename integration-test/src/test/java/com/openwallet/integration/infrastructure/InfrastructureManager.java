@@ -17,7 +17,7 @@ import java.time.Duration;
  */
 @Slf4j
 @Getter
-public class InfrastructureManager {
+public class InfrastructureManager implements InfrastructureInfo {
 
     private Network network;
     private PostgreSQLContainer<?> postgresContainer;

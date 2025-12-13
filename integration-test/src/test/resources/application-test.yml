@@ -42,3 +42,4 @@ logging:
     org.testcontainers: INFO
     org.springframework.kafka: DEBUG
 
+
