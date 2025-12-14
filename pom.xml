@@ -13,6 +13,7 @@
     <name>OpenWallet Microservices API</name>
     <description>Microservices backend for fintech wallet platform</description>
 
+
     <modules>
         <module>auth-service</module>
         <module>customer-service</module>
@@ -23,9 +24,9 @@
     </modules>
 
     <properties>
-        <java.version>17.0.1</java.version>
-        <maven.compiler.source>17.0.1</maven.compiler.source>
-        <maven.compiler.target>17.0.1</maven.compiler.target>
+        <java.version>17</java.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.2.0</spring-boot.version>
         <spring-cloud.version>2023.0.0</spring-cloud.version>

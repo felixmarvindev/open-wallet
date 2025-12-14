@@ -27,6 +27,7 @@
             <groupId>com.openwallet</groupId>
             <artifactId>auth-service</artifactId>
             <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.openwallet</groupId>
@@ -144,6 +145,7 @@
     </dependencies>
 
     <build>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -155,6 +157,7 @@
                     </includes>
                 </configuration>
             </plugin>
+
         </plugins>
     </build>
 
