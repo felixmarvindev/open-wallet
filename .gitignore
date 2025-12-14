@@ -134,3 +134,6 @@ dump.rdb
 
 AUTHENTICATION_GAP_ANALYSIS.md
 AUTHENTICATION_GAP_SUMMARY.md
+integration-test/src/test/resources/keycloak-realm.json
+integration-test/src/test/resources/openwallet-realm.json
+integration-test/src/test/resources/openwallet-realm2.json

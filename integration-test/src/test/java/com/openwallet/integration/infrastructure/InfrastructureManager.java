@@ -125,7 +125,7 @@ public class InfrastructureManager implements InfrastructureInfo {
         log.info("Keycloak database user: {}", postgresContainer.getUsername());
         
         try {
-            keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:26.4")
+            keycloakContainer = new KeycloakContainer("quay.io/keycloak/keycloak:26.0.7")
                     .withNetwork(network)
                     .withNetworkAliases("keycloak")
                     .withAdminUsername("admin")

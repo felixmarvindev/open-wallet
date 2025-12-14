@@ -143,6 +143,8 @@ public class EmbeddedServiceRunner {
         props.put("spring.security.oauth2.resourceserver.jwt.issuer-uri", issuerUri);
         props.put("keycloak.server-url", infrastructure.getKeycloakBaseUrl());
         props.put("keycloak.realm", infrastructure.getKeycloakRealm());
+        props.put("keycloak.required-actions", "[]");
+        props.put("keycloak.verify-email", "false");
         
         // Disable Redis health check if not needed
         props.put("management.health.redis.enabled", "false");

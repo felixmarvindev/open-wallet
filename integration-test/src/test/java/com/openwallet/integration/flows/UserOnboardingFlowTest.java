@@ -160,14 +160,12 @@ public class UserOnboardingFlowTest extends IntegrationTestBase {
         Map<String, Object> registerBody = authClient.parseJson(registerResponse.getBody());
         String userId = (String) registerBody.get("userId");
 
-        // Verify event was published
-        boolean eventFound = userEventsVerifier.verifyEventType("USER_REGISTERED", 10);
-        assertThat(eventFound).isTrue();
-        
-        // Verify event contains user ID
+        // Verify event was published with correct userId (single verification)
         KafkaEventVerifier.ConsumerRecordWrapper<String, String> event = 
-                userEventsVerifier.verifyEventContains("userId", userId, 5);
+                userEventsVerifier.verifyEventContains("userId", userId, 10);
         assertThat(event).isNotNull();
+        assertThat(event.value()).contains("\"eventType\":\"USER_REGISTERED\"");
+        assertThat(event.value()).contains("\"userId\":\"" + userId + "\"");
         
         log.info("✓ USER_REGISTERED event verified with userId: {}", userId);
     }

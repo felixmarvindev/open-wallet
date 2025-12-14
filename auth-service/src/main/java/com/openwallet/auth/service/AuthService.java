@@ -58,6 +58,8 @@ public class AuthService {
 
             return RegisterResponse.builder()
                     .userId(userId)
+                    .username(request.getUsername())
+                    .email(request.getEmail())
                     .message("User registered successfully")
                     .build();
         } catch (RuntimeException e) {
