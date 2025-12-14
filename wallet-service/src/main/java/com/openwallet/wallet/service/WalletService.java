@@ -10,6 +10,7 @@ import com.openwallet.wallet.exception.WalletAlreadyExistsException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @SuppressWarnings("null")
 public class WalletService {
 
@@ -98,6 +100,43 @@ public class WalletService {
                         .orElseThrow(() -> new WalletNotFoundException("Wallet not found")));
     }
 
+    /**
+     * Creates a wallet automatically from customer creation event.
+     * Uses default limits for KYC-pending customers.
+     * This is used by event listeners to create wallets automatically.
+     *
+     * @param customerId Customer ID from the event
+     * @return Created wallet
+     * @throws IllegalStateException if wallet already exists for this customer
+     */
+    @Transactional
+    public Wallet createWalletFromEvent(Long customerId) {
+        if (customerId == null) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
+
+        // Check if wallet already exists
+        if (!walletRepository.findByCustomerId(customerId).isEmpty()) {
+            throw new IllegalStateException("Wallet already exists for customerId: " + customerId);
+        }
+
+        // Create wallet with initial low limits (KYC pending)
+        Wallet wallet = Wallet.builder()
+                .customerId(customerId)
+                .currency("KES")  // Default currency
+                .balance(BigDecimal.ZERO)
+                .dailyLimit(new BigDecimal("5000.00"))    // Low limit (KYC pending)
+                .monthlyLimit(new BigDecimal("20000.00")) // Low limit (KYC pending)
+                .build();
+
+        Wallet saved = walletRepository.save(wallet);
+        
+        // Cache the initial balance
+        cacheBalance(saved, toResponse(saved));
+        
+        return saved;
+    }
+
     private WalletResponse toResponse(Wallet wallet) {
         return WalletResponse.builder()
                 .id(wallet.getId())
@@ -116,12 +155,22 @@ public class WalletService {
         return provided != null ? provided : fallback;
     }
 
+    /**
+     * Cache balance for performance optimization.
+     * Fails gracefully if Redis is unavailable - caching is optional.
+     */
     private void cacheBalance(Wallet wallet, WalletResponse response) {
-        BalanceSnapshot snapshot = new BalanceSnapshot(
-                response.getBalance().toPlainString(),
-                response.getCurrency(),
-                response.getUpdatedAt() != null ? response.getUpdatedAt().toString() : null);
-        balanceCacheService.putBalance(wallet.getId(), snapshot);
+        try {
+            BalanceSnapshot snapshot = new BalanceSnapshot(
+                    response.getBalance().toPlainString(),
+                    response.getCurrency(),
+                    response.getUpdatedAt() != null ? response.getUpdatedAt().toString() : null);
+            balanceCacheService.putBalance(wallet.getId(), snapshot);
+        } catch (Exception e) {
+            // Log but don't fail - caching is optional/best-effort
+            // This allows operation to succeed even if Redis is down
+            log.warn("Failed to cache balance for walletId={}: {}", wallet.getId(), e.getMessage());
+        }
     }
 }
 

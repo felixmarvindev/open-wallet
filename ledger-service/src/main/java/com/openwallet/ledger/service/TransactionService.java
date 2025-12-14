@@ -26,7 +26,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
-@SuppressWarnings({ "DataFlowIssue", "ConstantConditions", "null" })
+@SuppressWarnings({"ConstantConditions", "null" })
 public class TransactionService {
 
     private final TransactionRepository transactionRepository;

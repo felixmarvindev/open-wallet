@@ -31,6 +31,7 @@ public class ServiceContainerManager {
     
     private AuthServiceContainer authService;
     private CustomerServiceContainer customerService;
+    private WalletServiceContainer walletService;
     
     public ServiceContainerManager(InfrastructureInfo infrastructure) {
         this.infrastructure = infrastructure;
@@ -43,9 +44,11 @@ public class ServiceContainerManager {
     private void initializeContainers() {
         authService = new AuthServiceContainer(infrastructure);
         customerService = new CustomerServiceContainer(infrastructure);
+        walletService = new WalletServiceContainer(infrastructure);
         
         containers.add(authService);
         containers.add(customerService);
+        containers.add(walletService);
     }
     
     /**

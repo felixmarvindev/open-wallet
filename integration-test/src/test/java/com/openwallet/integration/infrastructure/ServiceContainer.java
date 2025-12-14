@@ -10,8 +10,16 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Getter
 public abstract class ServiceContainer {
-    
+
+    /**
+     * -- GETTER --
+     *  Get the service name.
+     */
     protected final String serviceName;
+    /**
+     * -- GETTER --
+     *  Get the port.
+     */
     protected final int port;
     protected final InfrastructureInfo infrastructure;
     protected EmbeddedServiceRunner runner;
@@ -64,19 +72,6 @@ public abstract class ServiceContainer {
     public String getBaseUrl() {
         return runner != null ? runner.getBaseUrl() : null;
     }
-    
-    /**
-     * Get the service name.
-     */
-    public String getServiceName() {
-        return serviceName;
-    }
-    
-    /**
-     * Get the port.
-     */
-    public int getPort() {
-        return port;
-    }
+
 }
 

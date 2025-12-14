@@ -94,6 +94,7 @@ public class KafkaEventVerifier implements AutoCloseable {
 
     /**
      * Verifies that an event contains the specified field-value pair.
+     * Handles both string values (with quotes) and numeric values (without quotes).
      * 
      * @param field The JSON field name
      * @param value The expected value
@@ -102,7 +103,16 @@ public class KafkaEventVerifier implements AutoCloseable {
      */
     public ConsumerRecordWrapper<String, String> verifyEventContains(String field, String value, int timeoutSeconds) {
         return waitForEvent(
-                r -> r.value() != null && r.value().contains("\"" + field + "\":\"" + value + "\""),
+                r -> {
+                    if (r.value() == null) {
+                        return false;
+                    }
+                    // Check for string value: "field":"value"
+                    boolean stringMatch = r.value().contains("\"" + field + "\":\"" + value + "\"");
+                    // Check for numeric value: "field":value
+                    boolean numericMatch = r.value().contains("\"" + field + "\":" + value);
+                    return stringMatch || numericMatch;
+                },
                 timeoutSeconds
         );
     }

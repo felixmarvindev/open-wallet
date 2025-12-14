@@ -92,6 +92,42 @@ public class CustomerService {
         
         return toResponse(saved);
     }
+
+    /**
+     * Creates a customer profile automatically from user registration event.
+     * Uses placeholder data that can be updated later by the user.
+     * This is used by event listeners to create customer profiles automatically.
+     *
+     * @param userId   Keycloak user ID
+     * @param username Username from registration
+     * @param email    Email from registration
+     * @return Created customer
+     * @throws IllegalStateException if customer already exists for this userId
+     */
+    @Transactional
+    public Customer createCustomerFromEvent(String userId, String username, String email) {
+        // Check if customer already exists
+        if (customerRepository.findByUserId(userId).isPresent()) {
+            throw new IllegalStateException("Customer already exists for userId: " + userId);
+        }
+
+        // Create customer with placeholder data
+        Customer customer = Customer.builder()
+                .userId(userId)
+                .firstName(extractFirstName(username))
+                .lastName(extractLastName(username))
+                .email(email)
+                .phoneNumber("+254000000000") // Placeholder - will be updated by user
+                .status(CustomerStatus.ACTIVE)
+                .build();
+
+        Customer saved = customerRepository.save(customer);
+
+        // CRITICAL: Ensure mapping exists for JWT resolution
+        ensureMappingExists(saved);
+
+        return saved;
+    }
     
     /**
      * Create or update customer-user mapping.
@@ -129,6 +165,38 @@ public class CustomerService {
                 .address(customer.getAddress())
                 .status(customer.getStatus() != null ? customer.getStatus().name() : null)
                 .build();
+    }
+
+    /**
+     * Extract first name from username (simple heuristic for auto-creation).
+     */
+    private String extractFirstName(String username) {
+        if (username == null) {
+            return "User";
+        }
+        String[] parts = username.split("_");
+        return parts.length > 0 ? capitalize(parts[0]) : "User";
+    }
+
+    /**
+     * Extract last name from username (simple heuristic for auto-creation).
+     */
+    private String extractLastName(String username) {
+        if (username == null) {
+            return "Unknown";
+        }
+        String[] parts = username.split("_");
+        return parts.length > 1 ? parts[1] : "Unknown";
+    }
+
+    /**
+     * Capitalize first letter of a string.
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
     }
 }
 

@@ -96,6 +96,14 @@ public class TestHttpClient {
     }
 
     /**
+     * Parses JSON response to a List of Maps (for array responses).
+     */
+    @SuppressWarnings("unchecked")
+    public java.util.List<Map<String, Object>> parseJsonArray(String json) throws IOException {
+        return objectMapper.readValue(json, java.util.List.class);
+    }
+
+    /**
      * HTTP response wrapper.
      */
     public static class HttpResponse {
