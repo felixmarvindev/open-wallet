@@ -37,7 +37,7 @@ class AuthControllerTest {
     private AuthService authService;
 
     @Test
-    @DisplayName("POST /register should return 200 with userId")
+    @DisplayName("POST /register should return 201 with user details")
     void registerShouldReturnSuccess() throws Exception {
         // Given
         RegisterRequest request = RegisterRequest.builder()
@@ -48,6 +48,8 @@ class AuthControllerTest {
 
         RegisterResponse response = RegisterResponse.builder()
                 .userId("keycloak-user-id-123")
+                .username("testuser")
+                .email("test@example.com")
                 .message("User registered successfully")
                 .build();
 
@@ -57,8 +59,10 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.userId").value("keycloak-user-id-123"))
+                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.email").value("test@example.com"))
                 .andExpect(jsonPath("$.message").value("User registered successfully"));
     }
 

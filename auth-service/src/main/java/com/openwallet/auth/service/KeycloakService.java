@@ -43,6 +43,10 @@ public class KeycloakService {
 
     @Value("${keycloak.client-secret}")
     private String clientSecret;
+    @Value("${keycloak.required-actions:[]}")
+    private List<String> requiredActions;
+    @Value("${keycloak.verify-email:false}")
+    private boolean verifyEmail;
 
     private final RestTemplate restTemplate;
 
@@ -75,8 +79,13 @@ public class KeycloakService {
         UserRepresentation user = new UserRepresentation();
         user.setUsername(username);
         user.setEmail(email);
-        user.setEmailVerified(true);
         user.setEnabled(true);
+        user.setRequiredActions(requiredActions);
+        if (verifyEmail) {
+            user.setEmailVerified(false);
+        } else {
+            user.setEmailVerified(true);
+        }
 
         // Create user
         Response response = usersResource.create(user);
