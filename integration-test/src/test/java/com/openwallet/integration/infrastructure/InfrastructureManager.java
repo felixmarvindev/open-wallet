@@ -132,6 +132,8 @@ public class InfrastructureManager implements InfrastructureInfo {
                     .withAdminPassword("admin")
                     .withReuse(true) // Reuse container across test runs if possible
                     .withStartupTimeout(Duration.ofMinutes(3))
+                    // Import realm configuration with clients and users
+                    .withRealmImportFile("openwallet-realm.json")
                     // Configure database connection to use PostgreSQL container
                     .withEnv("KC_DB", "postgres")
                     .withEnv("KC_DB_URL", dbUrl)
@@ -149,6 +151,10 @@ public class InfrastructureManager implements InfrastructureInfo {
             keycloakRealm = "openwallet";
 
             log.info("Keycloak started successfully at: {}", keycloakBaseUrl);
+            log.info("Keycloak realm '{}' imported with clients and users", keycloakRealm);
+            log.info("  - Test user: admin/admin (ADMIN role)");
+            log.info("  - Test user: testuser/testpass (USER, CUSTOMER roles)");
+            log.info("  - Clients: auth-service, customer-service, wallet-service, frontend-app");
         } catch (Exception e) {
             log.error("Failed to start Keycloak container", e);
             if (keycloakContainer != null && keycloakContainer.getContainerId() != null) {

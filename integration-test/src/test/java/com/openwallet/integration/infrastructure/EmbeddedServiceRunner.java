@@ -49,8 +49,15 @@ public class EmbeddedServiceRunner {
      * Services run in the same JVM but on different ports.
      */
     public void start() {
+        log.info("========================================");
         log.info("Starting {} on port {}...", serviceName, port);
-        log.info("TestContainers Database URL: {}", infrastructure.getPostgresJdbcUrl());
+        log.info("========================================");
+        log.info("Infrastructure Configuration:");
+        log.info("  - Database: {}", infrastructure.getPostgresJdbcUrl());
+        log.info("  - Kafka: {}", infrastructure.getKafkaBootstrapServers());
+        log.info("  - Keycloak: {}", infrastructure.getKeycloakBaseUrl());
+        log.info("  - Keycloak Realm: {}", infrastructure.getKeycloakRealm());
+        log.info("========================================");
         
         SpringApplication app = new SpringApplication(mainClass);
         app.setAdditionalProfiles("test");
@@ -61,14 +68,30 @@ public class EmbeddedServiceRunner {
         
         // Use command-line args to override properties (higher precedence than profile configs)
         // This ensures we override the hardcoded localhost:5433 from application-local.yml
+        String keycloakIssuerUri = infrastructure.getKeycloakBaseUrl() + "/realms/" + infrastructure.getKeycloakRealm();
+        
         String[] args = new String[] {
+            // Database configuration (TestContainers PostgreSQL)
             "--spring.datasource.url=" + infrastructure.getPostgresJdbcUrl(),
             "--spring.datasource.username=" + infrastructure.getPostgresUsername(),
             "--spring.datasource.password=" + infrastructure.getPostgresPassword(),
             "--spring.flyway.enabled=false",
+            
+            // Server configuration
             "--server.port=" + port,
+            
             // JPA: auto-create tables instead of validating (overrides application-local.yml)
             "--spring.jpa.hibernate.ddl-auto=update",
+            
+            // Keycloak configuration (TestContainers Keycloak)
+            "--keycloak.server-url=" + infrastructure.getKeycloakBaseUrl(),
+            "--keycloak.realm=" + infrastructure.getKeycloakRealm(),
+            "--spring.security.oauth2.resourceserver.jwt.issuer-uri=" + keycloakIssuerUri,
+            
+            // Kafka configuration (TestContainers Kafka)
+            "--spring.kafka.bootstrap-servers=" + infrastructure.getKafkaBootstrapServers(),
+            "--kafka.bootstrap-servers=" + infrastructure.getKafkaBootstrapServers(),
+            
             // Disable health checks for services not available in test environment
             "--management.health.redis.enabled=false",
             // Override readiness group to exclude redis (since it's disabled)
