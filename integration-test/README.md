@@ -1,134 +1,263 @@
-# Integration Test Module
+# Integration Tests
 
-This module contains end-to-end integration tests for the OpenWallet microservices platform.
-
-## Overview
-
-The integration tests use **TestContainers** to spin up real infrastructure (PostgreSQL, Kafka, Keycloak) and test complete flows across multiple microservices.
-
-## Prerequisites
-
-- **Docker** must be installed and running
-- **Java 17+**
-- **Maven 3.8+**
+Fast integration tests using embedded Spring Boot services with TestContainers infrastructure.
 
 ## Architecture
 
 ```
-Integration Test Module
-├── InfrastructureManager      # Manages TestContainers lifecycle
-├── IntegrationTestBase         # Base class for all integration tests
-├── flows/                      # End-to-end test flows
-│   ├── UserOnboardingFlowTest
-│   ├── WalletCreationFlowTest
-│   └── TransactionFlowTest
-└── utils/                      # Test utilities
-    ├── TestRestClient
-    ├── KafkaTestUtils
-    └── KeycloakTestUtils
+┌─────────────────────────────────────────────────────────────┐
+│                    IntegrationTestBase                       │
+│  - Manages TestContainers (PostgreSQL, Kafka, Keycloak)    │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│              ServiceContainerManager                         │
+│  - Orchestrates all microservice containers                 │
+│  - Provides centralized lifecycle management                │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+         ┌─────────────┼─────────────┐
+         ▼             ▼             ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│   Auth       │ │  Customer    │ │   Future     │
+│   Service    │ │  Service     │ │   Services   │
+│  Container   │ │  Container   │ │  Container   │
+└──────────────┘ └──────────────┘ └──────────────┘
 ```
 
-## Running Tests
+## Components
 
-### Run All Integration Tests
-```bash
-mvn test -pl integration-test
-```
+### 1. **Infrastructure Layer**
 
-### Run Specific Test Class
-```bash
-mvn test -pl integration-test -Dtest=UserOnboardingFlowTest
-```
+#### `InfrastructureManager`
+- Manages TestContainers for PostgreSQL, Kafka, and Keycloak
+- Provides dynamic connection URLs for tests
+- Ensures containers are reused across tests for speed
 
-### Run from Root Directory
-```bash
-mvn test -pl integration-test
-```
+#### `IntegrationTestBase`
+- Base class for all integration tests
+- Starts infrastructure in `@BeforeAll`
+- Provides helper methods for infrastructure access
 
-## Infrastructure
+### 2. **Service Container Layer**
 
-The tests automatically start:
-- **PostgreSQL 15** - Database for all services
-- **Kafka 7.5.0** - Event streaming platform
-- **Keycloak 23.0.0** - Identity and access management
+#### `ServiceContainer` (Abstract)
+- Base class for all service containers
+- Manages service lifecycle (start/stop)
+- Wraps `EmbeddedServiceRunner` for cleaner API
 
-Containers are reused across test classes for performance (using `withReuse(true)`).
+#### `AuthServiceContainer`
+- Container for auth-service
+- Default port: 9001
 
-## Writing Tests
+#### `CustomerServiceContainer`
+- Container for customer-service
+- Default port: 9002
 
-### Basic Test Structure
+#### `ServiceContainerManager`
+- Orchestrates all service containers
+- Provides `startAll()`, `stopAll()` methods
+- Gives centralized access to all services
+- Reports service status
+
+### 3. **Test Execution Layer**
+
+#### `EmbeddedServiceRunner`
+- Runs Spring Boot services in the same JVM (not Docker)
+- Configures services with TestContainers URLs
+- Overrides profile configurations via command-line args
+- Waits for health checks before proceeding
+
+## Benefits
+
+### ✅ **Fast Startup**
+- **10-20 seconds** vs 2-5 minutes with Docker
+- Services run in same JVM
+- No image builds required
+
+### ✅ **Easy Debugging**
+- Direct access to service logs
+- Standard Java debugging works
+- Breakpoints in service code
+
+### ✅ **Production-Like**
+- Real HTTP communication
+- Real database (PostgreSQL)
+- Real message broker (Kafka)
+- Real auth server (Keycloak)
+
+### ✅ **Clean Architecture**
+- Service containers encapsulate service details
+- Manager provides simple API
+- Easy to add new services
+
+## Usage
+
+### Basic Test Example
 
 ```java
-@SpringBootTest
-class MyIntegrationTest extends IntegrationTestBase {
-    
+@DisplayName("My Integration Test")
+public class MyIntegrationTest extends IntegrationTestBase {
+
+    private static ServiceContainerManager serviceManager;
+
+    @BeforeAll
+    static void startServices() {
+        // Initialize and start all services
+        serviceManager = new ServiceContainerManager(getInfrastructure());
+        serviceManager.startAll();
+    }
+
+    @AfterAll
+    static void stopServices() {
+        if (serviceManager != null) {
+            serviceManager.stopAll();
+        }
+    }
+
     @Test
     void myTest() {
-        // Infrastructure is already started
-        // Use getInfrastructure() to access container details
-        String postgresUrl = getPostgresUrl();
-        String kafkaServers = getKafkaBootstrapServers();
+        // Access services
+        String authUrl = serviceManager.getAuthService().getBaseUrl();
+        String customerUrl = serviceManager.getCustomerService().getBaseUrl();
         
-        // Your test code here
+        // Make HTTP calls, test interactions, etc.
     }
 }
 ```
 
-### Accessing Infrastructure
+### Starting Specific Services
 
 ```java
-// Get infrastructure manager
-InfrastructureManager infra = getInfrastructure();
+// Start only auth service
+serviceManager.start(serviceManager.getAuthService());
 
-// Get connection details
-String postgresUrl = getPostgresUrl();
-String kafkaServers = getKafkaBootstrapServers();
-String keycloakUrl = getKeycloakBaseUrl();
+// Start multiple services
+serviceManager.start(
+    serviceManager.getAuthService(),
+    serviceManager.getCustomerService()
+);
 ```
 
-## Test Flows
+### Checking Service Status
 
-### Phase 1: Basic Setup ✅
-- [x] Create integration-test module
-- [x] Set up TestContainers for PostgreSQL, Kafka, Keycloak
-- [x] Create base test class with infrastructure setup
+```java
+// Check if all services are running
+boolean allUp = serviceManager.allRunning();
 
-### Phase 2: Service Management (Next)
-- [ ] Create ServiceManager to start/stop microservices
-- [ ] Add health check waiting logic
-- [ ] Configure services to use TestContainers infrastructure
+// Get detailed status
+String status = serviceManager.getStatus();
+log.info(status);
+// Output:
+// Service Status:
+//   - auth-service: RUNNING (port 9001)
+//   - customer-service: RUNNING (port 9002)
+```
 
-### Phase 3: Test Flows (Future)
-- [ ] User onboarding flow (Register → Create Customer)
-- [ ] Wallet creation flow (Create Wallet → Fund Wallet)
-- [ ] Transaction flow (Transfer → Verify Balance)
-- [ ] Event-driven flow (Transaction → Notification)
+## Adding a New Service
+
+1. **Create Service Container**
+
+```java
+public class PaymentServiceContainer extends ServiceContainer {
+    
+    public static final int DEFAULT_PORT = 9003;
+    
+    public PaymentServiceContainer(InfrastructureInfo infrastructure) {
+        super("payment-service", DEFAULT_PORT, infrastructure);
+    }
+    
+    @Override
+    protected Class<?> getMainClass() {
+        return PaymentServiceApplication.class;
+    }
+}
+```
+
+2. **Register in ServiceContainerManager**
+
+```java
+@Getter
+public class ServiceContainerManager {
+    
+    private PaymentServiceContainer paymentService;
+    
+    private void initializeContainers() {
+        authService = new AuthServiceContainer(infrastructure);
+        customerService = new CustomerServiceContainer(infrastructure);
+        paymentService = new PaymentServiceContainer(infrastructure); // Add this
+        
+        containers.add(authService);
+        containers.add(customerService);
+        containers.add(paymentService); // Add this
+    }
+}
+```
+
+3. **Use in Tests**
+
+```java
+String paymentUrl = serviceManager.getPaymentService().getBaseUrl();
+```
+
+## Configuration
+
+### Command-Line Args (Highest Precedence)
+
+The `EmbeddedServiceRunner` overrides service configurations via command-line args:
+
+- `spring.datasource.url` → TestContainers PostgreSQL URL
+- `spring.flyway.enabled` → false (disabled)
+- `spring.jpa.hibernate.ddl-auto` → update (auto-create tables)
+- `management.health.redis.enabled` → false (disabled)
+- `management.endpoint.health.group.readiness.include` → db,diskSpace,ping
+
+This ensures services use test infrastructure instead of local configs.
+
+## Running Tests
+
+### IDE (IntelliJ IDEA)
+Right-click on test class → Run
+
+### Maven
+```bash
+mvn test -Dtest=ServiceStartupProofTest
+```
+
+### All Integration Tests
+```bash
+mvn test -pl integration-test
+```
 
 ## Troubleshooting
 
-### Docker Not Running
-```
-Error: Could not find a valid Docker environment
-```
-**Solution**: Ensure Docker Desktop (or Docker daemon) is running.
+### Services Don't Start
+- Check if ports 9001, 9002 are available
+- Review service logs for errors
+- Ensure Docker is running (for TestContainers)
 
-### Port Conflicts
-```
-Error: Port already in use
-```
-**Solution**: TestContainers uses random ports by default. If conflicts occur, check for other running containers.
+### Health Check Fails
+- Increase timeout in `EmbeddedServiceRunner.waitForHealth()`
+- Check which health indicator is failing (logs show response)
+- Verify infrastructure containers are running
 
-### Container Startup Timeout
-```
-Error: Container startup timeout
-```
-**Solution**: Increase timeout in `InfrastructureManager` or check Docker resources (CPU/Memory).
+### Database Issues
+- Ensure PostgreSQL TestContainer is up
+- Check connection URL in logs
+- Verify `ddl-auto=update` is set (auto-creates tables)
 
-## Notes
+## Performance Tips
 
-- Containers are started once and reused across test classes for performance
-- Each test class gets a fresh database (if using `@Transactional` or manual cleanup)
-- Kafka topics are created automatically
-- Keycloak realm must be configured manually (see `docs/KEYCLOAK_SETUP.md`)
+1. **Reuse Infrastructure** - TestContainers stay running across test classes
+2. **Parallel Tests** - Run test classes in parallel (but services in sequence)
+3. **Selective Services** - Start only services needed for specific tests
+4. **Container Reuse** - Enable TestContainers reuse flag (already enabled)
 
+## Future Enhancements
 
+- [ ] Service dependency management (start order)
+- [ ] Parallel service startup
+- [ ] Health check customization per service
+- [ ] Integration with Testcontainers Cloud
+- [ ] Performance metrics collection
