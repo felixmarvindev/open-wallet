@@ -94,30 +94,46 @@ class CustomerCreationFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("Create customer should fail when customer already exists for userId")
-    void createCustomerShouldFailWhenCustomerExists() {
+    @DisplayName("Create customer should update existing customer when customer already exists for userId (upsert)")
+    void createCustomerShouldUpdateExistingWhenCustomerExists() {
         // Given: Customer already exists
         String userId = "e2e-user-duplicate-123";
-        customerRepository.save(Customer.builder()
+        Customer existingCustomer = customerRepository.save(Customer.builder()
                 .userId(userId)
                 .firstName("Existing")
                 .lastName("User")
                 .phoneNumber("+254711111111")
                 .email("existing@example.com")
+                .address("Old Address")
                 .status(CustomerStatus.ACTIVE)
                 .build());
 
         CreateCustomerRequest request = CreateCustomerRequest.builder()
                 .firstName("New")
-                .lastName("User")
+                .lastName("Updated")
                 .phoneNumber("+254722222222")
                 .email("new@example.com")
+                .address("New Address")
                 .build();
 
-        // When/Then: Should throw exception
-        assertThatThrownBy(() -> customerService.createCustomer(userId, request))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("already exists");
+        // When: Try to create customer again (upsert)
+        CustomerResponse response = customerService.createCustomer(userId, request);
+
+        // Then: Should update existing customer with new data (upsert behavior)
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(existingCustomer.getId());
+        assertThat(response.getUserId()).isEqualTo(userId);
+        assertThat(response.getFirstName()).isEqualTo("New"); // Updated with request data
+        assertThat(response.getLastName()).isEqualTo("Updated"); // Updated with request data
+        assertThat(response.getEmail()).isEqualTo("new@example.com"); // Updated with request data
+        assertThat(response.getPhoneNumber()).isEqualTo("+254722222222"); // Updated with request data
+        assertThat(response.getAddress()).isEqualTo("New Address"); // Updated with request data
+
+        // Verify database was updated
+        Customer updated = customerRepository.findById(existingCustomer.getId())
+                .orElseThrow(() -> new IllegalStateException("Customer not found"));
+        assertThat(updated.getFirstName()).isEqualTo("New");
+        assertThat(updated.getEmail()).isEqualTo("new@example.com");
     }
 
     @Test

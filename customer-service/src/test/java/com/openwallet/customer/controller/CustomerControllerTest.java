@@ -120,25 +120,27 @@ class CustomerControllerTest {
     }
 
     @Test
-    void createCustomerShouldReturn400WhenCustomerAlreadyExists() throws Exception {
+    void createCustomerShouldUpdateExistingCustomerWhenCustomerAlreadyExists() throws Exception {
         // Given: Customer already exists
-        customerRepository.save(Customer.builder()
+        Customer existingCustomer = customerRepository.save(Customer.builder()
                 .userId("user-duplicate-123")
                 .firstName("Existing")
                 .lastName("User")
                 .phoneNumber("+254711111111")
                 .email("existing@example.com")
+                .address("Old Address")
                 .status(CustomerStatus.ACTIVE)
                 .build());
 
         CreateCustomerRequest request = CreateCustomerRequest.builder()
                 .firstName("New")
-                .lastName("User")
+                .lastName("Updated")
                 .phoneNumber("+254722222222")
                 .email("new@example.com")
+                .address("New Address")
                 .build();
 
-        // When/Then: Should return 400 Bad Request
+        // When/Then: Should return 201 Created (or 200 OK) with updated customer (upsert behavior)
         mockMvc.perform(post("/api/v1/customers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
@@ -148,8 +150,15 @@ class CustomerControllerTest {
                                                 Collections.singletonMap("roles",
                                                         Arrays.asList("USER"))))
                                 .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already exists")));
+                .andExpect(status().isCreated()) // 201 Created
+                .andExpect(jsonPath("$.id").value(existingCustomer.getId().intValue()))
+                .andExpect(jsonPath("$.userId").value("user-duplicate-123"))
+                .andExpect(jsonPath("$.firstName").value("New")) // Updated
+                .andExpect(jsonPath("$.lastName").value("Updated")) // Updated
+                .andExpect(jsonPath("$.email").value("new@example.com")) // Updated
+                .andExpect(jsonPath("$.phoneNumber").value("+254722222222")) // Updated
+                .andExpect(jsonPath("$.address").value("New Address")) // Updated
+                .andExpect(jsonPath("$.status").value("ACTIVE")); // Status unchanged
     }
 
     @Test

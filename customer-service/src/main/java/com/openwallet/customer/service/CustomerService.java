@@ -29,49 +29,95 @@ public class CustomerService {
     }
 
     /**
-     * Creates a new customer profile for the authenticated user.
+     * Creates or updates a customer profile for the authenticated user (upsert).
+     * This method is idempotent: if a customer already exists for the userId, it updates
+     * the existing customer with the new data. This ensures safe request reprocessing
+     * and handles race conditions while allowing profile updates through the create endpoint.
      *
      * @param userId  Keycloak user ID (from JWT)
      * @param request Customer creation request
-     * @return Created customer response
-     * @throws IllegalStateException    if customer already exists for this userId
-     * @throws IllegalArgumentException if email or phone number already exists
+     * @return Created or updated customer response (idempotent upsert)
+     * @throws IllegalArgumentException if email or phone number already exists for a different user
      */
     @Transactional
     public CustomerResponse createCustomer(String userId, CreateCustomerRequest request) {
-        // Check if customer already exists for this userId
-        if (customerRepository.findByUserId(userId).isPresent()) {
-            throw new IllegalStateException("Customer already exists for this user");
-        }
+        // Upsert: update existing customer if found, otherwise create new
+        return customerRepository.findByUserId(userId)
+                .map(existing -> {
+                    // Validate email uniqueness (if changing email)
+                    if (!existing.getEmail().equals(request.getEmail())) {
+                        customerRepository.findByEmail(request.getEmail())
+                                .ifPresent(otherCustomer -> {
+                                    if (!otherCustomer.getUserId().equals(userId)) {
+                                        throw new IllegalArgumentException(
+                                                "Customer with email '" + request.getEmail() + "' already exists");
+                                    }
+                                });
+                    }
 
-        // Check if email already exists
-        if (customerRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Customer with email '" + request.getEmail() + "' already exists");
-        }
+                    // Validate phone uniqueness (if changing phone and phone is provided)
+                    if (request.getPhoneNumber() != null && 
+                        (existing.getPhoneNumber() == null || !existing.getPhoneNumber().equals(request.getPhoneNumber()))) {
+                        customerRepository.findByPhoneNumber(request.getPhoneNumber())
+                                .ifPresent(otherCustomer -> {
+                                    if (!otherCustomer.getUserId().equals(userId)) {
+                                        throw new IllegalArgumentException(
+                                                "Customer with phone number '" + request.getPhoneNumber() + "' already exists");
+                                    }
+                                });
+                    }
 
-        // Check if phone number already exists
-        if (customerRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()) {
-            throw new IllegalArgumentException(
-                    "Customer with phone number '" + request.getPhoneNumber() + "' already exists");
-        }
+                    // Update existing customer with new data
+                    existing.setFirstName(request.getFirstName());
+                    existing.setLastName(request.getLastName());
+                    existing.setEmail(request.getEmail());
+                    existing.setPhoneNumber(request.getPhoneNumber()); // Can be null
+                    existing.setAddress(request.getAddress());
+                    // Status remains unchanged (don't override status on update)
 
-        // Create customer entity
-        Customer customer = Customer.builder()
-                .userId(userId)
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
-                .phoneNumber(request.getPhoneNumber())
-                .email(request.getEmail())
-                .address(request.getAddress())
-                .status(CustomerStatus.ACTIVE)
-                .build();
+                    Customer saved = customerRepository.save(existing);
+                    ensureMappingExists(saved);
+                    return toResponse(saved);
+                })
+                .orElseGet(() -> {
+                    // Check if email already exists for a different user
+                    customerRepository.findByEmail(request.getEmail())
+                            .ifPresent(existing -> {
+                                if (!existing.getUserId().equals(userId)) {
+                                    throw new IllegalArgumentException(
+                                            "Customer with email '" + request.getEmail() + "' already exists");
+                                }
+                            });
 
-        Customer saved = customerRepository.save(customer);
+                    // Check if phone number already exists for a different user (only if phone is provided)
+                    if (request.getPhoneNumber() != null) {
+                        customerRepository.findByPhoneNumber(request.getPhoneNumber())
+                                .ifPresent(existing -> {
+                                    if (!existing.getUserId().equals(userId)) {
+                                        throw new IllegalArgumentException(
+                                                "Customer with phone number '" + request.getPhoneNumber() + "' already exists");
+                                    }
+                                });
+                    }
 
-        // Ensure mapping exists
-        ensureMappingExists(saved);
+                    // Create new customer entity
+                    Customer customer = Customer.builder()
+                            .userId(userId)
+                            .firstName(request.getFirstName())
+                            .lastName(request.getLastName())
+                            .phoneNumber(request.getPhoneNumber()) // Can be null
+                            .email(request.getEmail())
+                            .address(request.getAddress())
+                            .status(CustomerStatus.ACTIVE)
+                            .build();
 
-        return toResponse(saved);
+                    Customer saved = customerRepository.save(customer);
+
+                    // Ensure mapping exists
+                    ensureMappingExists(saved);
+
+                    return toResponse(saved);
+                });
     }
 
     @Transactional

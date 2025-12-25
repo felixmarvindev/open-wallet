@@ -154,7 +154,7 @@ public class CustomerProfileCrudTest extends IntegrationTestBase {
         // Try to update with missing fields
         Map<String, String> updateRequest = new HashMap<>();
         updateRequest.put("firstName", "John");
-        // Missing lastName, phoneNumber, email
+        // Missing lastName and email (phoneNumber is optional, so not required)
 
         TestHttpClient.HttpResponse response = customerClient.put(
                 "/api/v1/customers/me",
