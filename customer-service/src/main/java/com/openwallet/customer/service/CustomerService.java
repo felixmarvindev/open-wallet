@@ -81,9 +81,15 @@ public class CustomerService {
 
         customer.setFirstName(request.getFirstName());
         customer.setLastName(request.getLastName());
-        customer.setPhoneNumber(request.getPhoneNumber());
+        // Only update phone number if provided (allows partial updates)
+        if (request.getPhoneNumber() != null) {
+            customer.setPhoneNumber(request.getPhoneNumber());
+        }
         customer.setEmail(request.getEmail());
-        customer.setAddress(request.getAddress());
+        // Only update address if provided (allows partial updates)
+        if (request.getAddress() != null) {
+            customer.setAddress(request.getAddress());
+        }
 
         Customer saved = customerRepository.save(customer);
         
@@ -94,39 +100,45 @@ public class CustomerService {
     }
 
     /**
-     * Creates a customer profile automatically from user registration event.
-     * Uses placeholder data that can be updated later by the user.
-     * This is used by event listeners to create customer profiles automatically.
+     * Creates or retrieves a customer profile automatically from user registration event.
+     * This method is idempotent: if a customer already exists for the userId, it returns
+     * the existing customer. This ensures safe event reprocessing and handles race conditions.
+     * 
+     * Uses partial data (phone number is null) that can be updated later by the user
+     * during profile completion. This is used by event listeners to create customer profiles automatically.
      *
      * @param userId   Keycloak user ID
      * @param username Username from registration
      * @param email    Email from registration
-     * @return Created customer
-     * @throws IllegalStateException if customer already exists for this userId
+     * @return Created or existing customer (idempotent)
      */
     @Transactional
     public Customer createCustomerFromEvent(String userId, String username, String email) {
-        // Check if customer already exists
-        if (customerRepository.findByUserId(userId).isPresent()) {
-            throw new IllegalStateException("Customer already exists for userId: " + userId);
-        }
+        // Idempotent: return existing customer if found
+        return customerRepository.findByUserId(userId)
+                .map(existing -> {
+                    // Ensure mapping exists (in case it was missing)
+                    ensureMappingExists(existing);
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    // Create new customer with partial data (phone number is null until user completes profile)
+                    Customer customer = Customer.builder()
+                            .userId(userId)
+                            .firstName(extractFirstName(username))
+                            .lastName(extractLastName(username))
+                            .email(email)
+                            .phoneNumber(null) // NULL until user provides phone during profile completion
+                            .status(CustomerStatus.ACTIVE)
+                            .build();
 
-        // Create customer with placeholder data
-        Customer customer = Customer.builder()
-                .userId(userId)
-                .firstName(extractFirstName(username))
-                .lastName(extractLastName(username))
-                .email(email)
-                .phoneNumber("+254000000000") // Placeholder - will be updated by user
-                .status(CustomerStatus.ACTIVE)
-                .build();
+                    Customer saved = customerRepository.save(customer);
 
-        Customer saved = customerRepository.save(customer);
+                    // CRITICAL: Ensure mapping exists for JWT resolution
+                    ensureMappingExists(saved);
 
-        // CRITICAL: Ensure mapping exists for JWT resolution
-        ensureMappingExists(saved);
-
-        return saved;
+                    return saved;
+                });
     }
     
     /**

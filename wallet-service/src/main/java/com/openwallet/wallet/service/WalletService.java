@@ -101,13 +101,15 @@ public class WalletService {
     }
 
     /**
-     * Creates a wallet automatically from customer creation event.
+     * Creates or retrieves a wallet automatically from customer creation event.
+     * This method is idempotent: if a wallet already exists for the customer, it returns
+     * the existing wallet. This ensures safe event reprocessing and handles race conditions.
+     * 
      * Uses default limits for KYC-pending customers.
      * This is used by event listeners to create wallets automatically.
      *
      * @param customerId Customer ID from the event
-     * @return Created wallet
-     * @throws IllegalStateException if wallet already exists for this customer
+     * @return Created or existing wallet (idempotent)
      */
     @Transactional
     public Wallet createWalletFromEvent(Long customerId) {
@@ -115,9 +117,13 @@ public class WalletService {
             throw new IllegalArgumentException("Customer ID is required");
         }
 
-        // Check if wallet already exists
-        if (!walletRepository.findByCustomerId(customerId).isEmpty()) {
-            throw new IllegalStateException("Wallet already exists for customerId: " + customerId);
+        // Idempotent: return existing wallet if found
+        List<Wallet> existingWallets = walletRepository.findByCustomerId(customerId);
+        if (!existingWallets.isEmpty()) {
+            Wallet existing = existingWallets.get(0);
+            // Ensure balance is cached
+            cacheBalance(existing, toResponse(existing));
+            return existing;
         }
 
         // Create wallet with initial low limits (KYC pending)

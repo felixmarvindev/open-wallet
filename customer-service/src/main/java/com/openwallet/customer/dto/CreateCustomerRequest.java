@@ -28,9 +28,8 @@ public class CreateCustomerRequest {
     @Size(max = 100, message = "Last name must not exceed 100 characters")
     private String lastName;
 
-    @NotBlank(message = "Phone number is required")
     @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid phone number format")
-    private String phoneNumber;
+    private String phoneNumber; // Optional during initial creation, can be set later
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")

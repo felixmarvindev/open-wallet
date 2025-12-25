@@ -48,10 +48,9 @@ public class Customer {
     @NotBlank(message = "Last name is required")
     private String lastName;
 
-    @Column(name = "phone_number", nullable = false, unique = true, length = 20)
-    @NotBlank(message = "Phone number is required")
+    @Column(name = "phone_number", nullable = true, unique = true, length = 20)
     @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid phone number format")
-    private String phoneNumber;
+    private String phoneNumber; // Nullable during initial registration, required when user completes profile
 
     @Column(name = "email", nullable = false, unique = true, length = 255)
     @NotBlank(message = "Email is required")

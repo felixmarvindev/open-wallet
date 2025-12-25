@@ -64,33 +64,32 @@ public class CustomerEventListener {
         log.info("Processing CUSTOMER_CREATED event: customerId={}, userId={}", customerId, userId);
 
         try {
-            // Delegate to service - ensures all business logic is applied
-            // including balance caching and proper initialization
-            Wallet savedWallet = walletService.createWalletFromEvent(customerId);
+            // Delegate to service - idempotent operation: creates if new, returns existing if already present
+            // This ensures safe event reprocessing and handles race conditions gracefully
+            Wallet wallet = walletService.createWalletFromEvent(customerId);
             
-            log.info("Created wallet: walletId={}, customerId={}, balance={}, dailyLimit={}", 
-                    savedWallet.getId(), customerId, savedWallet.getBalance(), savedWallet.getDailyLimit());
+            log.info("Wallet ensured: walletId={}, customerId={}, balance={}, dailyLimit={}", 
+                    wallet.getId(), customerId, wallet.getBalance(), wallet.getDailyLimit());
 
             // Publish WALLET_CREATED event
+            // Note: This may publish duplicate events if the same CUSTOMER_CREATED event is processed
+            // multiple times, but downstream services should handle idempotency
             WalletEvent walletEvent = WalletEvent.builder()
-                    .walletId(savedWallet.getId())
+                    .walletId(wallet.getId())
                     .customerId(customerId)
                     .userId(userId)
                     .eventType("WALLET_CREATED")
-                    .balance(savedWallet.getBalance())
-                    .currency(savedWallet.getCurrency())
+                    .balance(wallet.getBalance())
+                    .currency(wallet.getCurrency())
                     .timestamp(LocalDateTime.now())
                     .build();
 
             walletEventProducer.publish(walletEvent);
             
-            log.info("✓ Wallet created and WALLET_CREATED event published for customerId={}", customerId);
+            log.info("✓ Wallet ensured and WALLET_CREATED event published for customerId={}", customerId);
 
-        } catch (IllegalStateException e) {
-            // Wallet already exists - this is normal in case of reprocessing
-            log.info("Wallet already exists for customerId={}, skipping creation", customerId);
         } catch (Exception e) {
-            log.error("Failed to create wallet for customerId={}: {}", customerId, e.getMessage(), e);
+            log.error("Failed to process wallet for customerId={}: {}", customerId, e.getMessage(), e);
             processedCustomerIds.remove(customerId); // Allow retry
         }
     }

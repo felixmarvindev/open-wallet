@@ -67,16 +67,18 @@ public class UserEventListener {
                 userId, username, email);
 
         try {
-            // Delegate to service - ensures all business logic is applied
-            // including CustomerUserMapping creation for JWT resolution
-            Customer savedCustomer = customerService.createCustomerFromEvent(userId, username, email);
+            // Delegate to service - idempotent operation: creates if new, returns existing if already present
+            // This ensures safe event reprocessing and handles race conditions gracefully
+            Customer customer = customerService.createCustomerFromEvent(userId, username, email);
 
-            log.info("Created customer profile: customerId={}, userId={}", 
-                    savedCustomer.getId(), userId);
+            log.info("Customer profile ensured: customerId={}, userId={}, phoneNumber={}", 
+                    customer.getId(), userId, customer.getPhoneNumber() != null ? "set" : "null");
 
             // Publish CUSTOMER_CREATED event
+            // Note: This may publish duplicate events if the same USER_REGISTERED event is processed
+            // multiple times, but downstream services should handle idempotency
             CustomerEvent customerEvent = CustomerEvent.builder()
-                    .customerId(savedCustomer.getId())
+                    .customerId(customer.getId())
                     .userId(userId)
                     .email(email)
                     .eventType("CUSTOMER_CREATED")
@@ -85,13 +87,10 @@ public class UserEventListener {
 
             customerEventProducer.publish(customerEvent);
             
-            log.info("✓ Customer created and CUSTOMER_CREATED event published for userId={}", userId);
+            log.info("✓ Customer ensured and CUSTOMER_CREATED event published for userId={}", userId);
 
-        } catch (IllegalStateException e) {
-            // Customer already exists - this is normal in case of reprocessing
-            log.info("Customer already exists for userId={}, skipping creation", userId);
         } catch (Exception e) {
-            log.error("Failed to create customer for userId={}: {}", userId, e.getMessage(), e);
+            log.error("Failed to process customer for userId={}: {}", userId, e.getMessage(), e);
             processedUserIds.remove(userId); // Allow retry
         }
     }

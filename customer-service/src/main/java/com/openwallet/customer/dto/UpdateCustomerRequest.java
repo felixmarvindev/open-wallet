@@ -25,9 +25,8 @@ public class UpdateCustomerRequest {
     @Size(max = 100)
     private String lastName;
 
-    @NotBlank
     @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid phone number format")
-    private String phoneNumber;
+    private String phoneNumber; // Optional - only updates if provided
 
     @NotBlank
     @Email
