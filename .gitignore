@@ -137,3 +137,7 @@ AUTHENTICATION_GAP_SUMMARY.md
 integration-test/src/test/resources/keycloak-realm.json
 integration-test/src/test/resources/openwallet-realm.json
 integration-test/src/test/resources/openwallet-realm2.json
+integration-test/NEXT_STEPS_KYC.md
+integration-test/REALITY_CHECK.md
+integration-test/SIMPLE_CRUD_TESTS_STRATEGY.md
+integration-test/SERVICE_LAYER_AUDIT.md

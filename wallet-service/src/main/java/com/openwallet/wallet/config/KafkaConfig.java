@@ -1,5 +1,6 @@
 package com.openwallet.wallet.config;
 
+import com.openwallet.wallet.events.KycEvent;
 import com.openwallet.wallet.events.TransactionEvent;
 import com.openwallet.wallet.events.WalletEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -84,6 +85,27 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, Map<String, Object>> factory = 
             new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(customerEventConsumerFactory());
+        return factory;
+    }
+
+    // KycEvent Consumer
+    @Bean
+    public ConsumerFactory<String, KycEvent> kycEventConsumerFactory() {
+        JsonDeserializer<KycEvent> jsonDeserializer = new JsonDeserializer<>(KycEvent.class, false);
+        jsonDeserializer.addTrustedPackages("*");
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, jsonDeserializer);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), jsonDeserializer);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, KycEvent> kycEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, KycEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(kycEventConsumerFactory());
         return factory;
     }
 }

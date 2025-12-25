@@ -88,6 +88,39 @@ public class TestHttpClient {
     }
 
     /**
+     * Makes a PUT request with JSON body.
+     */
+    public HttpResponse put(String path, Object body) throws IOException {
+        return put(path, body, null);
+    }
+
+    /**
+     * Makes a PUT request with JSON body and optional authorization token.
+     */
+    public HttpResponse put(String path, Object body, String authToken) throws IOException {
+        String jsonBody = objectMapper.writeValueAsString(body);
+        
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(baseUrl + path)
+                .put(RequestBody.create(jsonBody, MediaType.get("application/json")))
+                .addHeader("Content-Type", "application/json");
+        
+        if (authToken != null) {
+            requestBuilder.addHeader("Authorization", "Bearer " + authToken);
+        }
+        
+        Request request = requestBuilder.build();
+        log.debug("PUT {} -> {}", path, jsonBody);
+        
+        try (Response response = httpClient.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : null;
+            log.debug("Response: {} {}", response.code(), responseBody);
+            
+            return new HttpResponse(response.code(), responseBody);
+        }
+    }
+
+    /**
      * Parses JSON response to a Map.
      */
     @SuppressWarnings("unchecked")

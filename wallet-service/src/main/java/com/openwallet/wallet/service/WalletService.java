@@ -137,6 +137,66 @@ public class WalletService {
         return saved;
     }
 
+    /**
+     * Updates wallet transaction limits after KYC verification.
+     * Called by KycEventListener when KYC_VERIFIED event is received.
+     *
+     * @param customerId Customer ID
+     * @param kycStatus  KYC status (VERIFIED, REJECTED, etc.)
+     * @throws IllegalStateException if no wallet exists for customer
+     */
+    @Transactional
+    public void updateLimitsAfterKyc(Long customerId, String kycStatus) {
+        if (customerId == null) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
+
+        log.info("Updating wallet limits for customerId={}, kycStatus={}", customerId, kycStatus);
+
+        List<Wallet> wallets = walletRepository.findByCustomerId(customerId);
+        if (wallets.isEmpty()) {
+            throw new IllegalStateException("No wallet found for customerId: " + customerId);
+        }
+
+        // Determine new limits based on KYC status
+        BigDecimal newDailyLimit;
+        BigDecimal newMonthlyLimit;
+
+        if ("VERIFIED".equals(kycStatus)) {
+            // KYC verified → High limits
+            newDailyLimit = new BigDecimal("50000.00");    // 50K KES daily
+            newMonthlyLimit = new BigDecimal("200000.00"); // 200K KES monthly
+            log.info("KYC VERIFIED: Applying high limits ({}D, {}M)", newDailyLimit, newMonthlyLimit);
+        } else {
+            // KYC rejected or other status → Keep low limits
+            newDailyLimit = new BigDecimal("5000.00");     // 5K KES daily
+            newMonthlyLimit = new BigDecimal("20000.00");  // 20K KES monthly
+            log.info("KYC NOT VERIFIED: Keeping low limits ({}D, {}M)", newDailyLimit, newMonthlyLimit);
+        }
+
+        // Update all wallets for this customer
+        for (Wallet wallet : wallets) {
+            wallet.setDailyLimit(newDailyLimit);
+            wallet.setMonthlyLimit(newMonthlyLimit);
+            wallet.setUpdatedAt(LocalDateTime.now());
+            walletRepository.save(wallet);
+
+            log.info("Updated wallet: walletId={}, currency={}, dailyLimit={}, monthlyLimit={}",
+                    wallet.getId(), wallet.getCurrency(), newDailyLimit, newMonthlyLimit);
+
+            // Update cache gracefully
+            try {
+                WalletResponse response = toResponse(wallet);
+                cacheBalance(wallet, response);
+                log.debug("Refreshed balance cache for walletId={}", wallet.getId());
+            } catch (Exception e) {
+                log.warn("Failed to refresh cache for walletId={}: {}", wallet.getId(), e.getMessage());
+            }
+        }
+
+        log.info("✓ Successfully updated limits for {} wallet(s), customerId={}", wallets.size(), customerId);
+    }
+
     private WalletResponse toResponse(Wallet wallet) {
         return WalletResponse.builder()
                 .id(wallet.getId())
