@@ -74,7 +74,27 @@ public class TransactionEventListener {
                 default:
                     log.warn("Unknown transaction type: {}, txId={}", transactionType, event.getTransactionId());
             }
+        } catch (com.openwallet.wallet.exception.InsufficientBalanceException e) {
+            // Insufficient balance - this is a business logic error, not a transient failure
+            // Log as error but don't retry - the transaction should not have been completed
+            log.error("Insufficient balance for transaction txId={}, type={}: {}", 
+                    event.getTransactionId(), transactionType, e.getMessage());
+            // Re-throw to allow Kafka to handle (may need to send to DLQ or alert)
+            throw new RuntimeException("Insufficient balance for transaction", e);
+        } catch (com.openwallet.wallet.exception.WalletNotFoundException e) {
+            // Wallet not found - this is a data integrity issue
+            log.error("Wallet not found for transaction txId={}, type={}: {}", 
+                    event.getTransactionId(), transactionType, e.getMessage());
+            // Re-throw to allow Kafka to handle
+            throw new RuntimeException("Wallet not found for transaction", e);
+        } catch (IllegalArgumentException e) {
+            // Invalid input - this is a data integrity issue
+            log.error("Invalid transaction data for txId={}, type={}: {}", 
+                    event.getTransactionId(), transactionType, e.getMessage());
+            // Re-throw to allow Kafka to handle
+            throw new RuntimeException("Invalid transaction data", e);
         } catch (Exception e) {
+            // Transient or unexpected error - retry may help
             log.error("Failed to update balance for transaction txId={}, type={}: {}", 
                     event.getTransactionId(), transactionType, e.getMessage(), e);
             // Re-throw to allow Kafka to retry the event

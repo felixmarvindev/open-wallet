@@ -63,6 +63,13 @@ public class WalletExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "Access denied: " + ex.getMessage(), request);
     }
 
+    @ExceptionHandler(InsufficientBalanceException.class)
+    @ResponseBody
+    public ResponseEntity<ApiError> handleInsufficientBalance(InsufficientBalanceException ex,
+            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseBody
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,

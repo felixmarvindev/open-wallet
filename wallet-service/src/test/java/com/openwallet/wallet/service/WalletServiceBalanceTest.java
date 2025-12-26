@@ -3,6 +3,7 @@ package com.openwallet.wallet.service;
 import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.config.JpaConfig;
 import com.openwallet.wallet.domain.Wallet;
+import com.openwallet.wallet.exception.InsufficientBalanceException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.WalletRepository;
 import org.junit.jupiter.api.Test;
@@ -140,8 +141,14 @@ class WalletServiceBalanceTest {
                 "WITHDRAWAL",
                 false // Debit: decrease balance
         ))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Insufficient balance");
+                .isInstanceOf(InsufficientBalanceException.class)
+                .hasMessageContaining("Insufficient balance")
+                .satisfies(ex -> {
+                    InsufficientBalanceException ibe = (InsufficientBalanceException) ex;
+                    assertThat(ibe.getWalletId()).isEqualTo(wallet.getId());
+                    assertThat(ibe.getCurrentBalance()).isEqualByComparingTo(new BigDecimal("50.00"));
+                    assertThat(ibe.getRequestedAmount()).isEqualByComparingTo(new BigDecimal("100.00"));
+                });
 
         // Verify balance unchanged
         Wallet unchanged = walletRepository.findById(wallet.getId())

@@ -6,6 +6,7 @@ import com.openwallet.wallet.domain.Wallet;
 import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.WalletResponse;
+import com.openwallet.wallet.exception.InsufficientBalanceException;
 import com.openwallet.wallet.exception.WalletAlreadyExistsException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.WalletRepository;
@@ -152,6 +153,8 @@ public class WalletService {
      * - WITHDRAWAL: Decreases balance (fromWalletId)
      * - TRANSFER: Decreases balance (fromWalletId) and increases balance (toWalletId)
      * 
+     * Uses pessimistic locking to prevent concurrent update issues.
+     * Implements retry logic for transient database failures.
      * After updating the database, the cache is invalidated and refreshed with the new balance.
      *
      * @param walletId        Wallet ID to update
@@ -159,10 +162,12 @@ public class WalletService {
      * @param transactionType Transaction type (DEPOSIT, WITHDRAWAL, TRANSFER)
      * @param isCredit        true if this is a credit (increase balance), false if debit (decrease balance)
      * @throws WalletNotFoundException if wallet not found
-     * @throws IllegalArgumentException if balance would become negative
+     * @throws InsufficientBalanceException if balance would become negative
+     * @throws IllegalArgumentException if invalid input
      */
     @Transactional
     public void updateBalanceFromTransaction(Long walletId, BigDecimal amount, String transactionType, boolean isCredit) {
+        // Input validation
         if (walletId == null) {
             throw new IllegalArgumentException("Wallet ID is required");
         }
@@ -176,45 +181,85 @@ public class WalletService {
         log.info("Updating balance for walletId={}, amount={}, type={}, isCredit={}", 
                 walletId, amount, transactionType, isCredit);
 
-        Wallet wallet = walletRepository.findById(walletId)
-                .orElseThrow(() -> new WalletNotFoundException("Wallet not found: " + walletId));
+        // Retry logic for transient database failures
+        int maxRetries = 3;
+        int retryDelayMs = 100;
+        Exception lastException = null;
 
-        BigDecimal currentBalance = wallet.getBalance();
-        BigDecimal newBalance;
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Use pessimistic lock to prevent concurrent updates
+                Wallet wallet = walletRepository.findByIdWithLock(walletId)
+                        .orElseThrow(() -> new WalletNotFoundException("Wallet not found: " + walletId));
 
-        if (isCredit) {
-            // Credit: increase balance (DEPOSIT to wallet, TRANSFER to wallet)
-            newBalance = currentBalance.add(amount);
-        } else {
-            // Debit: decrease balance (WITHDRAWAL from wallet, TRANSFER from wallet)
-            newBalance = currentBalance.subtract(amount);
-            
-            // Validate balance doesn't go negative
-            if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-                log.warn("Insufficient balance for walletId={}: current={}, requested={}, would result={}", 
-                        walletId, currentBalance, amount, newBalance);
-                throw new IllegalArgumentException(
-                        String.format("Insufficient balance. Current: %s, Requested: %s", currentBalance, amount));
+                BigDecimal currentBalance = wallet.getBalance();
+                BigDecimal newBalance;
+
+                if (isCredit) {
+                    // Credit: increase balance (DEPOSIT to wallet, TRANSFER to wallet)
+                    newBalance = currentBalance.add(amount);
+                } else {
+                    // Debit: decrease balance (WITHDRAWAL from wallet, TRANSFER from wallet)
+                    newBalance = currentBalance.subtract(amount);
+                    
+                    // Validate balance doesn't go negative
+                    if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                        log.warn("Insufficient balance for walletId={}: current={}, requested={}, would result={}", 
+                                walletId, currentBalance, amount, newBalance);
+                        throw new InsufficientBalanceException(walletId, currentBalance, amount);
+                    }
+                }
+
+                // Update wallet balance
+                wallet.setBalance(newBalance);
+                wallet.setUpdatedAt(LocalDateTime.now());
+                Wallet saved = walletRepository.save(wallet);
+
+                log.info("Balance updated for walletId={}: {} → {} (change: {}{})", 
+                        walletId, currentBalance, newBalance, isCredit ? "+" : "-", amount);
+
+                // Refresh cache with new balance
+                try {
+                    WalletResponse response = toResponse(saved);
+                    cacheBalance(saved, response);
+                    log.debug("Refreshed balance cache for walletId={}", walletId);
+                } catch (Exception e) {
+                    log.warn("Failed to refresh cache for walletId={}: {}", walletId, e.getMessage());
+                    // Don't fail the transaction if cache update fails
+                }
+
+                // Success - return early
+                return;
+
+            } catch (WalletNotFoundException | InsufficientBalanceException | IllegalArgumentException e) {
+                // Don't retry for business logic errors
+                throw e;
+            } catch (org.springframework.dao.DataAccessException e) {
+                // Transient database error - retry
+                lastException = e;
+                if (attempt < maxRetries) {
+                    log.warn("Transient database error updating balance for walletId={}, attempt {}/{}: {}", 
+                            walletId, attempt, maxRetries, e.getMessage());
+                    try {
+                        Thread.sleep(retryDelayMs * attempt); // Exponential backoff
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted during retry", ie);
+                    }
+                } else {
+                    log.error("Failed to update balance for walletId={} after {} attempts", walletId, maxRetries, e);
+                }
+            } catch (Exception e) {
+                // Unexpected error - don't retry
+                log.error("Unexpected error updating balance for walletId={}: {}", walletId, e.getMessage(), e);
+                throw new RuntimeException("Failed to update wallet balance", e);
             }
         }
 
-        // Update wallet balance
-        wallet.setBalance(newBalance);
-        wallet.setUpdatedAt(LocalDateTime.now());
-        Wallet saved = walletRepository.save(wallet);
-
-        log.info("Balance updated for walletId={}: {} → {} (change: {}{})", 
-                walletId, currentBalance, newBalance, isCredit ? "+" : "-", amount);
-
-        // Refresh cache with new balance
-        try {
-            WalletResponse response = toResponse(saved);
-            cacheBalance(saved, response);
-            log.debug("Refreshed balance cache for walletId={}", walletId);
-        } catch (Exception e) {
-            log.warn("Failed to refresh cache for walletId={}: {}", walletId, e.getMessage());
-            // Don't fail the transaction if cache update fails
-        }
+        // If we get here, all retries failed
+        throw new RuntimeException(
+                String.format("Failed to update balance for walletId=%d after %d attempts", walletId, maxRetries),
+                lastException);
     }
 
     /**
