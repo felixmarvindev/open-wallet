@@ -144,6 +144,80 @@ public class WalletService {
     }
 
     /**
+     * Updates wallet balance from a completed transaction.
+     * Called by TransactionEventListener when TRANSACTION_COMPLETED event is received.
+     * 
+     * This method atomically updates the wallet balance based on the transaction type:
+     * - DEPOSIT: Increases balance (toWalletId)
+     * - WITHDRAWAL: Decreases balance (fromWalletId)
+     * - TRANSFER: Decreases balance (fromWalletId) and increases balance (toWalletId)
+     * 
+     * After updating the database, the cache is invalidated and refreshed with the new balance.
+     *
+     * @param walletId        Wallet ID to update
+     * @param amount          Transaction amount
+     * @param transactionType Transaction type (DEPOSIT, WITHDRAWAL, TRANSFER)
+     * @param isCredit        true if this is a credit (increase balance), false if debit (decrease balance)
+     * @throws WalletNotFoundException if wallet not found
+     * @throws IllegalArgumentException if balance would become negative
+     */
+    @Transactional
+    public void updateBalanceFromTransaction(Long walletId, BigDecimal amount, String transactionType, boolean isCredit) {
+        if (walletId == null) {
+            throw new IllegalArgumentException("Wallet ID is required");
+        }
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+        if (transactionType == null) {
+            throw new IllegalArgumentException("Transaction type is required");
+        }
+
+        log.info("Updating balance for walletId={}, amount={}, type={}, isCredit={}", 
+                walletId, amount, transactionType, isCredit);
+
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet not found: " + walletId));
+
+        BigDecimal currentBalance = wallet.getBalance();
+        BigDecimal newBalance;
+
+        if (isCredit) {
+            // Credit: increase balance (DEPOSIT to wallet, TRANSFER to wallet)
+            newBalance = currentBalance.add(amount);
+        } else {
+            // Debit: decrease balance (WITHDRAWAL from wallet, TRANSFER from wallet)
+            newBalance = currentBalance.subtract(amount);
+            
+            // Validate balance doesn't go negative
+            if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+                log.warn("Insufficient balance for walletId={}: current={}, requested={}, would result={}", 
+                        walletId, currentBalance, amount, newBalance);
+                throw new IllegalArgumentException(
+                        String.format("Insufficient balance. Current: %s, Requested: %s", currentBalance, amount));
+            }
+        }
+
+        // Update wallet balance
+        wallet.setBalance(newBalance);
+        wallet.setUpdatedAt(LocalDateTime.now());
+        Wallet saved = walletRepository.save(wallet);
+
+        log.info("Balance updated for walletId={}: {} → {} (change: {}{})", 
+                walletId, currentBalance, newBalance, isCredit ? "+" : "-", amount);
+
+        // Refresh cache with new balance
+        try {
+            WalletResponse response = toResponse(saved);
+            cacheBalance(saved, response);
+            log.debug("Refreshed balance cache for walletId={}", walletId);
+        } catch (Exception e) {
+            log.warn("Failed to refresh cache for walletId={}: {}", walletId, e.getMessage());
+            // Don't fail the transaction if cache update fails
+        }
+    }
+
+    /**
      * Updates wallet transaction limits after KYC verification.
      * Called by KycEventListener when KYC_VERIFIED event is received.
      *
