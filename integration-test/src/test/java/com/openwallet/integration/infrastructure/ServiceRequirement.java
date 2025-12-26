@@ -37,7 +37,8 @@ public @interface ServiceRequirement {
     enum ServiceType {
         AUTH,
         CUSTOMER,
-        WALLET
+        WALLET,
+        LEDGER
     }
 }
 

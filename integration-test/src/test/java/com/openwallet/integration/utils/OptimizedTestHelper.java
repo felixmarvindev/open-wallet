@@ -171,6 +171,12 @@ public class OptimizedTestHelper {
                 }
                 yield new TestHttpClient(serviceManager.getWalletService().getBaseUrl());
             }
+            case LEDGER -> {
+                if (!serviceManager.isServiceRunning(ServiceRequirement.ServiceType.LEDGER)) {
+                    throw new IllegalStateException("Ledger service is not running");
+                }
+                yield new TestHttpClient(serviceManager.getLedgerService().getBaseUrl());
+            }
         };
     }
     

@@ -36,6 +36,7 @@ public class ServiceContainerManager {
     private AuthServiceContainer authService;
     private CustomerServiceContainer customerService;
     private WalletServiceContainer walletService;
+    private LedgerServiceContainer ledgerService;
     
     public ServiceContainerManager(InfrastructureInfo infrastructure) {
         this.infrastructure = infrastructure;
@@ -49,10 +50,12 @@ public class ServiceContainerManager {
         authService = new AuthServiceContainer(infrastructure);
         customerService = new CustomerServiceContainer(infrastructure);
         walletService = new WalletServiceContainer(infrastructure);
+        ledgerService = new LedgerServiceContainer(infrastructure);
         
         containers.add(authService);
         containers.add(customerService);
         containers.add(walletService);
+        containers.add(ledgerService);
     }
     
     /**
@@ -121,6 +124,11 @@ public class ServiceContainerManager {
             started.add(walletService);
         }
         
+        if (requiredSet.contains(ServiceRequirement.ServiceType.LEDGER)) {
+            ledgerService.start();
+            started.add(ledgerService);
+        }
+        
         long duration = (System.currentTimeMillis() - startTime) / 1000;
         log.info("========================================");
         log.info("✓ {} required service(s) started in {} seconds!", started.size(), duration);
@@ -141,6 +149,9 @@ public class ServiceContainerManager {
         log.info("Stopping {} required service(s)...", requiredSet.size());
         
         // Stop in reverse order
+        if (requiredSet.contains(ServiceRequirement.ServiceType.LEDGER) && ledgerService.isRunning()) {
+            ledgerService.stop();
+        }
         if (requiredSet.contains(ServiceRequirement.ServiceType.WALLET) && walletService.isRunning()) {
             walletService.stop();
         }
@@ -165,6 +176,7 @@ public class ServiceContainerManager {
             case AUTH -> authService;
             case CUSTOMER -> customerService;
             case WALLET -> walletService;
+            case LEDGER -> ledgerService;
         };
     }
     
