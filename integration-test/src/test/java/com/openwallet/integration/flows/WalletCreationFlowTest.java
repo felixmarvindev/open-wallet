@@ -1,8 +1,10 @@
 package com.openwallet.integration.flows;
 
 import com.openwallet.integration.IntegrationTestBase;
-import com.openwallet.integration.infrastructure.ServiceContainerManager;
+import com.openwallet.integration.infrastructure.ServiceRequirement;
 import com.openwallet.integration.utils.KafkaEventVerifier;
+import com.openwallet.integration.utils.OptimizedTestHelper;
+import com.openwallet.integration.utils.TestDataValidator;
 import com.openwallet.integration.utils.TestHttpClient;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -26,12 +28,20 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 5. Wallet Service listens → Creates Wallet
  * 6. WALLET_CREATED event → Kafka
  * 7. Verify wallet exists with correct initial limits
+ * 
+ * Optimized: Only starts AUTH, CUSTOMER, and WALLET services (all required for event flow).
+ * Note: Users are registered during test execution since this test validates the registration flow.
  */
 @Slf4j
 @DisplayName("Wallet Creation Flow")
+@ServiceRequirement({
+    ServiceRequirement.ServiceType.AUTH,
+    ServiceRequirement.ServiceType.CUSTOMER,
+    ServiceRequirement.ServiceType.WALLET
+})
 public class WalletCreationFlowTest extends IntegrationTestBase {
 
-    private ServiceContainerManager serviceManager;
+    private OptimizedTestHelper testHelper;
     private TestHttpClient authClient;
     private TestHttpClient walletClient;
     private KafkaEventVerifier userEventsVerifier;
@@ -40,13 +50,24 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
 
     @BeforeEach
     void setUp() {
-        log.info("Starting services for wallet creation flow test...");
-        serviceManager = new ServiceContainerManager(getInfrastructure());
-        serviceManager.startAll();
+        log.info("Starting optimized wallet creation flow test...");
         
-        authClient = new TestHttpClient(serviceManager.getAuthService().getBaseUrl());
-        walletClient = new TestHttpClient(serviceManager.getWalletService().getBaseUrl());
+        // Initialize helper (auto-starts only required services)
+        testHelper = new OptimizedTestHelper(getInfrastructure());
+        testHelper.startRequiredServices(this);
         
+        // Validate services are running (fast-fail)
+        testHelper.validateServices(
+            ServiceRequirement.ServiceType.AUTH,
+            ServiceRequirement.ServiceType.CUSTOMER,
+            ServiceRequirement.ServiceType.WALLET
+        );
+        
+        // Get clients
+        authClient = testHelper.getClient(ServiceRequirement.ServiceType.AUTH);
+        walletClient = testHelper.getClient(ServiceRequirement.ServiceType.WALLET);
+        
+        // Set up Kafka event verifiers
         userEventsVerifier = new KafkaEventVerifier(
                 getInfrastructure().getKafkaBootstrapServers(),
                 "user-events"
@@ -60,7 +81,7 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
                 "wallet-events"
         );
         
-        log.info("✓ All services started and ready for testing");
+        log.info("✓ Required services started and ready for testing");
     }
 
     @AfterEach
@@ -75,8 +96,8 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
         if (walletEventsVerifier != null) {
             walletEventsVerifier.close();
         }
-        if (serviceManager != null) {
-            serviceManager.stopAll();
+        if (testHelper != null) {
+            testHelper.cleanup();
         }
     }
 
@@ -92,16 +113,16 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
         registerRequest.put("password", "SecurePassword123!");
 
         TestHttpClient.HttpResponse registerResponse = authClient.post("/api/v1/auth/register", registerRequest);
-        assertThat(registerResponse.getStatusCode()).isEqualTo(201);
+        TestDataValidator.requireSuccess(registerResponse, "User registration");
         
         Map<String, Object> registerBody = authClient.parseJson(registerResponse.getBody());
         String userId = (String) registerBody.get("userId");
         String username = (String) registerBody.get("username");
         String email = (String) registerBody.get("email");
         
-        assertThat(userId).isNotNull();
-        assertThat(username).isNotNull();
-        assertThat(email).isNotNull();
+        TestDataValidator.requireNotNull(userId, "User ID");
+        TestDataValidator.requireNotNull(username, "Username");
+        TestDataValidator.requireNotNull(email, "Email");
         log.info("User registered - ID: {}, Username: {}, Email: {}", userId, username, email);
 
         // Step 2: Verify USER_REGISTERED event
@@ -161,11 +182,11 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
         loginRequest.put("password", "SecurePassword123!");
 
         TestHttpClient.HttpResponse loginResponse = authClient.post("/api/v1/auth/login", loginRequest);
-        assertThat(loginResponse.getStatusCode()).isEqualTo(200);
+        TestDataValidator.requireSuccess(loginResponse, "User login");
         
         Map<String, Object> loginBody = authClient.parseJson(loginResponse.getBody());
         String accessToken = (String) loginBody.get("accessToken");
-        assertThat(accessToken).isNotNull();
+        TestDataValidator.requireNotNull(accessToken, "Access token");
         log.info("✓ Login successful, received access token");
 
         // Step 6: Get wallet details and verify
@@ -175,7 +196,7 @@ public class WalletCreationFlowTest extends IntegrationTestBase {
                 accessToken
         );
         
-        assertThat(walletResponse.getStatusCode()).isEqualTo(200);
+        TestDataValidator.requireSuccess(walletResponse, "Get wallet details");
         
         // Parse response as array of wallets
         java.util.List<Map<String, Object>> wallets = walletClient.parseJsonArray(walletResponse.getBody());

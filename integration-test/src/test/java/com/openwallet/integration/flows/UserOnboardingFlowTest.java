@@ -1,8 +1,10 @@
 package com.openwallet.integration.flows;
 
 import com.openwallet.integration.IntegrationTestBase;
-import com.openwallet.integration.infrastructure.ServiceContainerManager;
+import com.openwallet.integration.infrastructure.ServiceRequirement;
 import com.openwallet.integration.utils.KafkaEventVerifier;
+import com.openwallet.integration.utils.OptimizedTestHelper;
+import com.openwallet.integration.utils.TestDataValidator;
 import com.openwallet.integration.utils.TestHttpClient;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -23,26 +25,35 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 4. Verify USER_REGISTERED event published → Kafka
  * 
  * This test validates the complete flow across multiple services.
+ * Optimized: Only starts AUTH and CUSTOMER services (not WALLET).
  */
 @Slf4j
 @DisplayName("User Onboarding Flow")
+@ServiceRequirement({ServiceRequirement.ServiceType.AUTH, ServiceRequirement.ServiceType.CUSTOMER})
 public class UserOnboardingFlowTest extends IntegrationTestBase {
 
-    private ServiceContainerManager serviceManager;
+    private OptimizedTestHelper testHelper;
     private TestHttpClient authClient;
     private TestHttpClient customerClient;
     private KafkaEventVerifier userEventsVerifier;
 
     @BeforeEach
     void setUp() {
-        // Start all services
-        log.info("Starting services for user onboarding flow test...");
-        serviceManager = new ServiceContainerManager(getInfrastructure());
-        serviceManager.startAll();
+        log.info("Starting optimized user onboarding flow test...");
         
-        // Create HTTP clients for services
-        authClient = new TestHttpClient(serviceManager.getAuthService().getBaseUrl());
-        customerClient = new TestHttpClient(serviceManager.getCustomerService().getBaseUrl());
+        // Initialize helper (auto-starts only AUTH and CUSTOMER services)
+        testHelper = new OptimizedTestHelper(getInfrastructure());
+        testHelper.startRequiredServices(this);
+        
+        // Validate services are running (fast-fail)
+        testHelper.validateServices(
+            ServiceRequirement.ServiceType.AUTH,
+            ServiceRequirement.ServiceType.CUSTOMER
+        );
+        
+        // Get clients
+        authClient = testHelper.getClient(ServiceRequirement.ServiceType.AUTH);
+        customerClient = testHelper.getClient(ServiceRequirement.ServiceType.CUSTOMER);
 
         // Set up Kafka event verifier for user-events topic
         userEventsVerifier = new KafkaEventVerifier(
@@ -50,7 +61,7 @@ public class UserOnboardingFlowTest extends IntegrationTestBase {
                 "user-events"
         );
         
-        log.info("✓ All services started and ready for testing");
+        log.info("✓ Required services started and ready for testing");
     }
 
     @AfterEach
@@ -59,8 +70,8 @@ public class UserOnboardingFlowTest extends IntegrationTestBase {
         if (userEventsVerifier != null) {
             userEventsVerifier.close();
         }
-        if (serviceManager != null) {
-            serviceManager.stopAll();
+        if (testHelper != null) {
+            testHelper.cleanup();
         }
     }
 

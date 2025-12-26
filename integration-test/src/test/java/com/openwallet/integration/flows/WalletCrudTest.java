@@ -1,8 +1,11 @@
 package com.openwallet.integration.flows;
 
 import com.openwallet.integration.IntegrationTestBase;
-import com.openwallet.integration.infrastructure.ServiceContainerManager;
+import com.openwallet.integration.infrastructure.ServiceRequirement;
+import com.openwallet.integration.utils.OptimizedTestHelper;
+import com.openwallet.integration.utils.TestDataValidator;
 import com.openwallet.integration.utils.TestHttpClient;
+import com.openwallet.integration.utils.TestUserManager;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,38 +26,98 @@ import static org.assertj.core.api.Assertions.assertThat;
  * - Get balance
  * - Cannot create duplicate currency
  * - Cannot access other user's wallet
+ * 
+ * Optimized: Only starts AUTH, CUSTOMER, and WALLET services.
+ * Note: CUSTOMER service is required for wallet auto-creation via events.
  */
 @Slf4j
 @DisplayName("Wallet CRUD Operations")
+@ServiceRequirement({
+    ServiceRequirement.ServiceType.AUTH, 
+    ServiceRequirement.ServiceType.CUSTOMER, 
+    ServiceRequirement.ServiceType.WALLET
+})
 public class WalletCrudTest extends IntegrationTestBase {
 
-    private ServiceContainerManager serviceManager;
+    private OptimizedTestHelper testHelper;
     private TestHttpClient authClient;
     private TestHttpClient walletClient;
+    private TestUserManager userManager;
+    
+    // Store usernames for reuse across tests
+    private String multiWalletUserUsername;
+    private String duplicateUserUsername;
+    private String balanceUserUsername;
+    private String user1Username;
+    private String user2Username;
 
     @BeforeEach
     void setUp() {
-        log.info("Starting services for wallet CRUD test...");
-        serviceManager = new ServiceContainerManager(getInfrastructure());
-        serviceManager.startAll();
-
-        authClient = new TestHttpClient(serviceManager.getAuthService().getBaseUrl());
-        walletClient = new TestHttpClient(serviceManager.getWalletService().getBaseUrl());
-
-        log.info("✓ Services ready");
+        log.info("Starting optimized wallet CRUD test...");
+        
+        // Initialize helper (auto-starts only required services)
+        testHelper = new OptimizedTestHelper(getInfrastructure());
+        testHelper.startRequiredServices(this);
+        
+        // Validate services are running (fast-fail)
+        testHelper.validateServices(
+            ServiceRequirement.ServiceType.AUTH,
+            ServiceRequirement.ServiceType.CUSTOMER,
+            ServiceRequirement.ServiceType.WALLET
+        );
+        
+        // Get clients
+        authClient = testHelper.getClient(ServiceRequirement.ServiceType.AUTH);
+        walletClient = testHelper.getClient(ServiceRequirement.ServiceType.WALLET);
+        userManager = testHelper.getUserManager();
+        
+        // Create test users before tests run
+        createTestUsers();
+        
+        log.info("✓ Required services started and ready for testing");
     }
 
     @AfterEach
     void tearDown() {
-        if (serviceManager != null) serviceManager.stopAll();
+        if (testHelper != null) {
+            testHelper.cleanup();
+        }
+    }
+    
+    /**
+     * Creates test users that will be used by tests.
+     * Users are created once before tests run, not during test execution.
+     */
+    private void createTestUsers() {
+        log.info("Creating test users for wallet CRUD tests...");
+        
+        // Create users with unique names to avoid conflicts
+        String timestamp = String.valueOf(System.currentTimeMillis());
+        
+        // Store usernames as instance variables
+        multiWalletUserUsername = "multiwalletuser_" + timestamp;
+        duplicateUserUsername = "duplicateuser_" + timestamp;
+        balanceUserUsername = "balanceuser_" + timestamp;
+        user1Username = "user1_" + timestamp;
+        user2Username = "user2_" + timestamp;
+        
+        // Create users
+        userManager.createUser(multiWalletUserUsername, multiWalletUserUsername + "@test.com");
+        userManager.createUser(duplicateUserUsername, duplicateUserUsername + "@test.com");
+        userManager.createUser(balanceUserUsername, balanceUserUsername + "@test.com");
+        userManager.createUser(user1Username, user1Username + "@test.com");
+        userManager.createUser(user2Username, user2Username + "@test.com");
+        
+        log.info("✓ Test users created: {}", timestamp);
     }
 
     @Test
     @DisplayName("User can create multiple wallets with different currencies")
     void userCanCreateMultipleWallets() throws Exception {
-        // Register and login
-        String[] credentials = registerAndLogin("multiwalletuser");
-        String accessToken = credentials[0];
+        // Use pre-created user
+        TestDataValidator.requireUserExists(userManager, multiWalletUserUsername);
+        String accessToken = userManager.getToken(multiWalletUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         // Wait for auto-created KES wallet
         Thread.sleep(2000);
@@ -98,8 +161,10 @@ public class WalletCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("Cannot create duplicate currency wallet")
     void cannotCreateDuplicateCurrencyWallet() throws Exception {
-        String[] credentials = registerAndLogin("duplicateuser");
-        String accessToken = credentials[0];
+        // Use pre-created user
+        TestDataValidator.requireUserExists(userManager, duplicateUserUsername);
+        String accessToken = userManager.getToken(duplicateUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         Thread.sleep(2000); // Wait for auto-created KES wallet
 
@@ -116,8 +181,10 @@ public class WalletCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("User can get wallet balance")
     void userCanGetWalletBalance() throws Exception {
-        String[] credentials = registerAndLogin("balanceuser");
-        String accessToken = credentials[0];
+        // Use pre-created user
+        TestDataValidator.requireUserExists(userManager, balanceUserUsername);
+        String accessToken = userManager.getToken(balanceUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         Thread.sleep(2000);
 
@@ -145,19 +212,22 @@ public class WalletCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("User cannot access another user's wallet")
     void userCannotAccessOtherUsersWallet() throws Exception {
-        // Create user 1
-        String[] user1Creds = registerAndLogin("user1");
-        String user1Token = user1Creds[0];
+        // Use pre-created users
+        TestDataValidator.requireUserExists(userManager, user1Username);
+        TestDataValidator.requireUserExists(userManager, user2Username);
+        
+        String user1Token = userManager.getToken(user1Username);
+        String user2Token = userManager.getToken(user2Username);
+        TestDataValidator.requireNotNull(user1Token, "User1 access token");
+        TestDataValidator.requireNotNull(user2Token, "User2 access token");
+        
         Thread.sleep(2000);
 
         // Get user1's wallet ID
         TestHttpClient.HttpResponse user1Wallets = walletClient.get("/api/v1/wallets/me", user1Token);
+        TestDataValidator.requireSuccess(user1Wallets, "Get user1 wallets");
         List<Map<String, Object>> wallets = walletClient.parseJsonArray(user1Wallets.getBody());
         Long user1WalletId = ((Number) wallets.get(0).get("id")).longValue();
-
-        // Create user 2
-        String[] user2Creds = registerAndLogin("user2");
-        String user2Token = user2Creds[0];
 
         Thread.sleep(2000);
 
@@ -172,28 +242,6 @@ public class WalletCrudTest extends IntegrationTestBase {
         log.info("✓ Cross-user access denied with status: {}", response.getStatusCode());
     }
 
-    // Helper method
-    private String[] registerAndLogin(String username) throws Exception {
-        String email = username + "@test.com";
-        String password = "Test123!@#";
-
-        // Register
-        Map<String, String> registerRequest = new HashMap<>();
-        registerRequest.put("username", username);
-        registerRequest.put("email", email);
-        registerRequest.put("password", password);
-        authClient.post("/api/v1/auth/register", registerRequest);
-
-        // Login
-        Map<String, String> loginRequest = new HashMap<>();
-        loginRequest.put("username", username);
-        loginRequest.put("password", password);
-        TestHttpClient.HttpResponse loginResponse = authClient.post("/api/v1/auth/login", loginRequest);
-        Map<String, Object> loginBody = authClient.parseJson(loginResponse.getBody());
-        String token = (String) loginBody.get("accessToken");
-
-        return new String[]{token, email};
-    }
 }
 
 

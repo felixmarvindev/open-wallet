@@ -4,7 +4,11 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Manages all service containers for integration tests.
@@ -78,6 +82,101 @@ public class ServiceContainerManager {
         for (ServiceContainer service : services) {
             service.start();
         }
+    }
+    
+    /**
+     * Start services based on ServiceRequirement types.
+     * Only starts the services specified in the requirement.
+     * 
+     * @param requirements Service types to start
+     */
+    public void startRequired(ServiceRequirement.ServiceType... requirements) {
+        if (requirements == null || requirements.length == 0) {
+            log.warn("No service requirements specified, starting all services");
+            startAll();
+            return;
+        }
+        
+        Set<ServiceRequirement.ServiceType> requiredSet = new HashSet<>(Arrays.asList(requirements));
+        long startTime = System.currentTimeMillis();
+        
+        log.info("========================================");
+        log.info("Starting required services: {}", Arrays.toString(requirements));
+        log.info("========================================");
+        
+        List<ServiceContainer> started = new ArrayList<>();
+        
+        if (requiredSet.contains(ServiceRequirement.ServiceType.AUTH)) {
+            authService.start();
+            started.add(authService);
+        }
+        
+        if (requiredSet.contains(ServiceRequirement.ServiceType.CUSTOMER)) {
+            customerService.start();
+            started.add(customerService);
+        }
+        
+        if (requiredSet.contains(ServiceRequirement.ServiceType.WALLET)) {
+            walletService.start();
+            started.add(walletService);
+        }
+        
+        long duration = (System.currentTimeMillis() - startTime) / 1000;
+        log.info("========================================");
+        log.info("✓ {} required service(s) started in {} seconds!", started.size(), duration);
+        log.info("========================================");
+    }
+    
+    /**
+     * Stop only the services that were started via startRequired().
+     * 
+     * @param requirements Service types to stop
+     */
+    public void stopRequired(ServiceRequirement.ServiceType... requirements) {
+        if (requirements == null || requirements.length == 0) {
+            return;
+        }
+        
+        Set<ServiceRequirement.ServiceType> requiredSet = new HashSet<>(Arrays.asList(requirements));
+        log.info("Stopping {} required service(s)...", requiredSet.size());
+        
+        // Stop in reverse order
+        if (requiredSet.contains(ServiceRequirement.ServiceType.WALLET) && walletService.isRunning()) {
+            walletService.stop();
+        }
+        if (requiredSet.contains(ServiceRequirement.ServiceType.CUSTOMER) && customerService.isRunning()) {
+            customerService.stop();
+        }
+        if (requiredSet.contains(ServiceRequirement.ServiceType.AUTH) && authService.isRunning()) {
+            authService.stop();
+        }
+        
+        log.info("✓ Required services stopped");
+    }
+    
+    /**
+     * Get service container by type.
+     * 
+     * @param type Service type
+     * @return Service container, or null if not found
+     */
+    public ServiceContainer getService(ServiceRequirement.ServiceType type) {
+        return switch (type) {
+            case AUTH -> authService;
+            case CUSTOMER -> customerService;
+            case WALLET -> walletService;
+        };
+    }
+    
+    /**
+     * Check if a specific service is running.
+     * 
+     * @param type Service type
+     * @return true if service is running
+     */
+    public boolean isServiceRunning(ServiceRequirement.ServiceType type) {
+        ServiceContainer service = getService(type);
+        return service != null && service.isRunning();
     }
     
     /**

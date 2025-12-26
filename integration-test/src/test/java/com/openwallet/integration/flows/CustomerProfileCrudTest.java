@@ -2,7 +2,11 @@ package com.openwallet.integration.flows;
 
 import com.openwallet.integration.IntegrationTestBase;
 import com.openwallet.integration.infrastructure.ServiceContainerManager;
+import com.openwallet.integration.infrastructure.ServiceRequirement;
+import com.openwallet.integration.utils.OptimizedTestHelper;
+import com.openwallet.integration.utils.TestDataValidator;
 import com.openwallet.integration.utils.TestHttpClient;
+import com.openwallet.integration.utils.TestUserManager;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,39 +26,92 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Slf4j
 @DisplayName("Customer Profile CRUD Operations")
+@ServiceRequirement({ServiceRequirement.ServiceType.AUTH, ServiceRequirement.ServiceType.CUSTOMER})
 public class CustomerProfileCrudTest extends IntegrationTestBase {
 
-    private ServiceContainerManager serviceManager;
-    private TestHttpClient authClient;
+    private OptimizedTestHelper testHelper;
     private TestHttpClient customerClient;
+    private TestUserManager userManager;
+
+    // Store usernames as instance variables so they can be reused across test methods
+    private String updateUserUsername;
+    private String validationUserUsername;
+    private String phoneValidationUserUsername;
+    private String requiredFieldsUserUsername;
 
     @BeforeEach
     void setUp() {
-        log.info("Starting services for customer profile CRUD test...");
-        serviceManager = new ServiceContainerManager(getInfrastructure());
-        serviceManager.startAll();
+        log.info("Setting up optimized test...");
 
-        authClient = new TestHttpClient(serviceManager.getAuthService().getBaseUrl());
-        customerClient = new TestHttpClient(serviceManager.getCustomerService().getBaseUrl());
+        // Initialize helper (auto-starts only required services)
+        testHelper = new OptimizedTestHelper(getInfrastructure());
+        testHelper.startRequiredServices(this);
 
-        log.info("✓ Services ready");
+        // Validate services are running (fast-fail)
+        testHelper.validateServices(
+                ServiceRequirement.ServiceType.AUTH,
+                ServiceRequirement.ServiceType.CUSTOMER
+        );
+
+        // Get clients
+        customerClient = testHelper.getClient(ServiceRequirement.ServiceType.CUSTOMER);
+        userManager = testHelper.getUserManager();
+
+        // Create test users before tests run
+        createTestUsers();
+
+        log.info("✓ Test setup complete");
     }
 
     @AfterEach
     void tearDown() {
-        if (serviceManager != null) serviceManager.stopAll();
+        if (testHelper != null) {
+            testHelper.cleanup();
+        }
+    }
+
+    /**
+     * Creates test users that will be used by tests.
+     * Users are created once before tests run, not during test execution.
+     * Usernames are stored as instance variables so they can be reused across test methods.
+     */
+    private void createTestUsers() {
+        log.info("Creating test users...");
+
+        // Create users with unique names to avoid conflicts
+        // Use a single timestamp for all users in this test run
+        String timestamp = String.valueOf(System.currentTimeMillis());
+
+        // Store usernames as instance variables
+        updateUserUsername = "updateuser_" + timestamp;
+        validationUserUsername = "validationuser_" + timestamp;
+        phoneValidationUserUsername = "phonevalidationuser_" + timestamp;
+        requiredFieldsUserUsername = "requiredfieldsuser_" + timestamp;
+
+        // Create users
+        userManager.createUser(updateUserUsername, updateUserUsername + "@test.com");
+        userManager.createUser(validationUserUsername, validationUserUsername + "@test.com");
+        userManager.createUser(phoneValidationUserUsername, phoneValidationUserUsername + "@test.com");
+        userManager.createUser(requiredFieldsUserUsername, requiredFieldsUserUsername + "@test.com");
+
+        log.info("✓ Test users created: {}", timestamp);
     }
 
     @Test
     @DisplayName("User can update their profile")
     void userCanUpdateProfile() throws Exception {
-        String[] credentials = registerAndLogin("updateuser");
-        String accessToken = credentials[0];
+        // Use pre-created user (username stored in instance variable)
+        TestDataValidator.requireUserExists(userManager, updateUserUsername);
+        String accessToken = userManager.getToken(updateUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
-        Thread.sleep(2000); // Wait for profile creation
+        // Wait for profile creation (from event)
+        Thread.sleep(2000);
 
         // Get initial profile
         TestHttpClient.HttpResponse initialProfile = customerClient.get("/api/v1/customers/me", accessToken);
+        TestDataValidator.requireSuccess(initialProfile, "Get initial profile");
+
         Map<String, Object> initial = customerClient.parseJson(initialProfile.getBody());
         log.info("Initial profile: firstName={}", initial.get("firstName"));
 
@@ -92,8 +149,10 @@ public class CustomerProfileCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("Profile update validates email format")
     void profileUpdateValidatesEmailFormat() throws Exception {
-        String[] credentials = registerAndLogin("validationuser");
-        String accessToken = credentials[0];
+        // Use pre-created user (username stored in instance variable)
+        TestDataValidator.requireUserExists(userManager, validationUserUsername);
+        String accessToken = userManager.getToken(validationUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         Thread.sleep(2000);
 
@@ -119,8 +178,10 @@ public class CustomerProfileCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("Profile update validates phone format")
     void profileUpdateValidatesPhoneFormat() throws Exception {
-        String[] credentials = registerAndLogin("phonevalidationuser");
-        String accessToken = credentials[0];
+        // Use pre-created user (username stored in instance variable)
+        TestDataValidator.requireUserExists(userManager, phoneValidationUserUsername);
+        String accessToken = userManager.getToken(phoneValidationUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         Thread.sleep(2000);
 
@@ -146,15 +207,17 @@ public class CustomerProfileCrudTest extends IntegrationTestBase {
     @Test
     @DisplayName("Profile update requires all fields")
     void profileUpdateRequiresAllFields() throws Exception {
-        String[] credentials = registerAndLogin("requiredfieldsuser");
-        String accessToken = credentials[0];
+        // Use pre-created user (username stored in instance variable)
+        TestDataValidator.requireUserExists(userManager, requiredFieldsUserUsername);
+        String accessToken = userManager.getToken(requiredFieldsUserUsername);
+        TestDataValidator.requireNotNull(accessToken, "Access token");
 
         Thread.sleep(2000);
 
         // Try to update with missing fields
         Map<String, String> updateRequest = new HashMap<>();
         updateRequest.put("firstName", "John");
-        // Missing lastName and email (phoneNumber is optional, so not required)
+        // Missing lastName and email (phoneNumber is optional)
 
         TestHttpClient.HttpResponse response = customerClient.put(
                 "/api/v1/customers/me",
@@ -166,30 +229,5 @@ public class CustomerProfileCrudTest extends IntegrationTestBase {
         assertThat(response.getStatusCode()).isEqualTo(400);
         log.info("✓ Missing fields rejected with status: {}", response.getStatusCode());
     }
-
-    // Helper method
-    private String[] registerAndLogin(String username) throws Exception {
-        String email = username + "@test.com";
-        String password = "Test123!@#";
-
-        // Register
-        Map<String, String> registerRequest = new HashMap<>();
-        registerRequest.put("username", username);
-        registerRequest.put("email", email);
-        registerRequest.put("password", password);
-        authClient.post("/api/v1/auth/register", registerRequest);
-
-        // Login
-        Map<String, String> loginRequest = new HashMap<>();
-        loginRequest.put("username", username);
-        loginRequest.put("password", password);
-        TestHttpClient.HttpResponse loginResponse = authClient.post("/api/v1/auth/login", loginRequest);
-        Map<String, Object> loginBody = authClient.parseJson(loginResponse.getBody());
-        String token = (String) loginBody.get("accessToken");
-
-        return new String[]{token, email};
-    }
 }
-
-
 
