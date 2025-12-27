@@ -42,6 +42,11 @@ spring:
         jwt:
           issuer-uri: http://localhost:8080/realms/openwallet
 
+app:
+  services:
+    ledger:
+      base-url: http://localhost:9004
+
 management:
   endpoints:
     web:

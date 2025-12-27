@@ -34,5 +34,21 @@ public class JwtUtils {
     public static String getUserId(Jwt jwt) {
         return jwt != null ? jwt.getSubject() : null;
     }
+
+    /**
+     * Gets the raw JWT token value from the current authentication.
+     * Used for passing the token to other services.
+     *
+     * @return Raw JWT token value, or null if not authenticated
+     */
+    public static String getTokenValue() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication instanceof JwtAuthenticationToken) {
+            JwtAuthenticationToken jwtAuth = (JwtAuthenticationToken) authentication;
+            Jwt jwt = jwtAuth.getToken();
+            return jwt.getTokenValue();
+        }
+        return null;
+    }
 }
 

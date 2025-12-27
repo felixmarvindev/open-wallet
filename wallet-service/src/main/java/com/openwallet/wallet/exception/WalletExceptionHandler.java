@@ -70,6 +70,14 @@ public class WalletExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(com.openwallet.wallet.service.BalanceReconciliationService.ReconciliationException.class)
+    @ResponseBody
+    public ResponseEntity<ApiError> handleReconciliationException(
+            com.openwallet.wallet.service.BalanceReconciliationService.ReconciliationException ex,
+            HttpServletRequest request) {
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseBody
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,

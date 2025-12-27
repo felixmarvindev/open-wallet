@@ -3,6 +3,7 @@ package com.openwallet.wallet.controller;
 import com.openwallet.wallet.config.JwtUtils;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.WalletResponse;
+import com.openwallet.wallet.service.BalanceReconciliationService;
 import com.openwallet.wallet.service.CustomerIdResolver;
 import com.openwallet.wallet.service.WalletService;
 import jakarta.validation.Valid;
@@ -28,6 +29,7 @@ public class WalletController {
 
     private final WalletService walletService;
     private final CustomerIdResolver customerIdResolver;
+    private final BalanceReconciliationService balanceReconciliationService;
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
@@ -68,6 +70,18 @@ public class WalletController {
         Long customerId = resolveCustomerId(headerCustomerId);
         List<WalletResponse> wallets = walletService.getMyWallets(customerId);
         return ResponseEntity.ok(wallets);
+    }
+
+    @GetMapping("/{id}/balance/reconcile")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'AUDITOR')")
+    public ResponseEntity<BalanceReconciliationService.ReconciliationResult> reconcileBalance(
+            @PathVariable("id") Long walletId,
+            @RequestHeader(value = "X-Customer-Id", required = false) Long headerCustomerId
+    ) {
+        Long customerId = resolveCustomerId(headerCustomerId);
+        BalanceReconciliationService.ReconciliationResult result = 
+                balanceReconciliationService.reconcileBalance(walletId, customerId);
+        return ResponseEntity.ok(result);
     }
 
     /**
