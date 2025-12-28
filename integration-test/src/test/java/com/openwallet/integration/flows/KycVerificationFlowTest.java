@@ -223,7 +223,7 @@ public class KycVerificationFlowTest extends IntegrationTestBase {
         // Create KES wallet (KES auto-created, but we can verify it exists)
         Map<String, String> kesRequest = new HashMap<>();
         kesRequest.put("currency", "KES");
-        walletClient.post("/api/v1/wallets", usdRequest, accessToken);
+        walletClient.post("/api/v1/wallets", kesRequest, accessToken);
 
         // Get customer ID
         TestHttpClient.HttpResponse customerResponse = customerClient.get("/api/v1/customers/me", accessToken);

@@ -48,6 +48,9 @@ class TransactionServiceUnitTest {
     @Mock
     private TransactionEventProducer transactionEventProducer;
 
+    @Mock
+    private LedgerEntryService ledgerEntryService;
+
     @InjectMocks
     private TransactionService transactionService;
 
@@ -82,6 +85,7 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("dep-1")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -164,6 +168,7 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("dep-fail")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class)))
                 .thenThrow(new RuntimeException("Database error"));
 
@@ -216,6 +221,7 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("wd-1")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(withdrawalTx);
+        when(ledgerEntryService.calculateBalanceFromLedger(21L)).thenReturn(new BigDecimal("100.00"));
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -278,6 +284,8 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("tr-1")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(transferTx);
+        when(ledgerEntryService.calculateBalanceFromLedger(30L)).thenReturn(new BigDecimal("100.00"));
+        when(ledgerEntryService.calculateBalanceFromLedger(31L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -433,6 +441,7 @@ class TransactionServiceUnitTest {
             tx.setId(1L);
             return tx;
         });
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -459,6 +468,7 @@ class TransactionServiceUnitTest {
             tx.setId(1L);
             return tx;
         });
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -572,6 +582,7 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("dep-event-fail")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doThrow(new RuntimeException("Kafka error")).when(transactionEventProducer).publish(any(TransactionEvent.class));
 
@@ -600,6 +611,7 @@ class TransactionServiceUnitTest {
 
         when(transactionRepository.findByIdempotencyKey("dep-entries")).thenReturn(Optional.empty());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
+        when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
