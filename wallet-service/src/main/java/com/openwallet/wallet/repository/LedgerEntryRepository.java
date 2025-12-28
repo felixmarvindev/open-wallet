@@ -14,6 +14,8 @@ import java.util.List;
  * 
  * Note: This is a read-only view - wallet service should never write to ledger_entries.
  * The ledger service owns this table and is the source of truth.
+ * 
+ * The LedgerEntry entity is marked as @Immutable to prevent write operations.
  */
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, Long> {
 

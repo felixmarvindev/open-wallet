@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = WalletController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
-@SuppressWarnings({ "DataFlowIssue", "null" })
+@SuppressWarnings({"null" })
 class WalletControllerTest {
 
     @Autowired

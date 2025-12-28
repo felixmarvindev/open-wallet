@@ -118,17 +118,17 @@ public class ServiceContainerManager {
             customerService.start();
             started.add(customerService);
         }
-        
-        if (requiredSet.contains(ServiceRequirement.ServiceType.WALLET)) {
-            walletService.start();
-            started.add(walletService);
-        }
-        
+
         if (requiredSet.contains(ServiceRequirement.ServiceType.LEDGER)) {
             ledgerService.start();
             started.add(ledgerService);
         }
-        
+
+        if (requiredSet.contains(ServiceRequirement.ServiceType.WALLET)) {
+            walletService.start();
+            started.add(walletService);
+        }
+
         long duration = (System.currentTimeMillis() - startTime) / 1000;
         log.info("========================================");
         log.info("✓ {} required service(s) started in {} seconds!", started.size(), duration);

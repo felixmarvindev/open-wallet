@@ -8,11 +8,13 @@ import com.openwallet.ledger.dto.TransferRequest;
 import com.openwallet.ledger.dto.WithdrawalRequest;
 import com.openwallet.ledger.dto.TransactionResponse;
 import com.openwallet.ledger.exception.TransactionNotFoundException;
+import com.openwallet.ledger.events.TransactionEventProducer;
 import com.openwallet.ledger.repository.LedgerEntryRepository;
 import com.openwallet.ledger.repository.TransactionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -36,6 +38,9 @@ class TransactionServiceTest {
 
     @Autowired
     private LedgerEntryRepository ledgerEntryRepository;
+
+    @MockBean
+    private TransactionEventProducer transactionEventProducer;
 
     @Test
     void createDepositShouldPersistTransactionAndEntries() {
@@ -113,5 +118,92 @@ class TransactionServiceTest {
     void getTransactionShouldThrowWhenMissing() {
         assertThatThrownBy(() -> transactionService.getTransaction(999L))
                 .isInstanceOf(TransactionNotFoundException.class);
+    }
+
+    @Test
+    void createDepositShouldThrowWhenToWalletIdIsNull() {
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(null)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("dep-null-wallet")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createDeposit(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("toWalletId is required for deposit");
+    }
+
+    @Test
+    void createWithdrawalShouldThrowWhenFromWalletIdIsNull() {
+        WithdrawalRequest request = WithdrawalRequest.builder()
+                .fromWalletId(null)
+                .amount(new BigDecimal("50.00"))
+                .currency("USD")
+                .idempotencyKey("wd-null-wallet")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createWithdrawal(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fromWalletId is required for withdrawal");
+    }
+
+    @Test
+    void createTransferShouldThrowWhenFromWalletIdIsNull() {
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(null)
+                .toWalletId(31L)
+                .amount(new BigDecimal("25.00"))
+                .currency("EUR")
+                .idempotencyKey("tr-null-from")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fromWalletId is required for transfer");
+    }
+
+    @Test
+    void createTransferShouldThrowWhenToWalletIdIsNull() {
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(30L)
+                .toWalletId(null)
+                .amount(new BigDecimal("25.00"))
+                .currency("EUR")
+                .idempotencyKey("tr-null-to")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("toWalletId is required for transfer");
+    }
+
+    @Test
+    void createTransferShouldThrowWhenWalletsAreSame() {
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(30L)
+                .toWalletId(30L)
+                .amount(new BigDecimal("25.00"))
+                .currency("EUR")
+                .idempotencyKey("tr-same-wallet")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fromWalletId and toWalletId must differ");
+    }
+
+    @Test
+    void createDepositShouldThrowWhenAmountIsInvalid() {
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(20L)
+                .amount(BigDecimal.ZERO)
+                .currency("KES")
+                .idempotencyKey("dep-zero-amount")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createDeposit(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Amount must be greater than 0");
     }
 }

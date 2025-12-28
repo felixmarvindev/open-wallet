@@ -28,7 +28,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
-@Import(JpaConfig.class)
+@Import({JpaConfig.class, com.openwallet.ledger.config.TestSecurityConfig.class})
 @ActiveProfiles("test")
 @Transactional
 @Rollback

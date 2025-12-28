@@ -17,10 +17,10 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "ledger_entries", indexes = {
-    @Index(name = "idx_ledger_transaction_id", columnList = "transaction_id"),
-    @Index(name = "idx_ledger_wallet_id", columnList = "wallet_id"),
-    @Index(name = "idx_ledger_account_type", columnList = "account_type"),
-    @Index(name = "idx_ledger_created_at", columnList = "created_at DESC")
+        @Index(name = "idx_ledger_transaction_id", columnList = "transaction_id"),
+        @Index(name = "idx_ledger_wallet_id", columnList = "wallet_id"),
+        @Index(name = "idx_ledger_account_type", columnList = "account_type"),
+        @Index(name = "idx_ledger_created_at", columnList = "created_at DESC")
 })
 @EntityListeners(AuditingEntityListener.class)
 @Getter
