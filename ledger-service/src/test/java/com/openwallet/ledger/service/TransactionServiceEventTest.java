@@ -18,7 +18,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @DataJpaTest
-@Import({com.openwallet.ledger.config.JpaConfig.class, TransactionService.class})
+@Import({com.openwallet.ledger.config.JpaConfig.class, TransactionService.class, LedgerEntryService.class})
 @ActiveProfiles("test")
 @SuppressWarnings({ "DataFlowIssue", "ConstantConditions", "null" })
 class TransactionServiceEventTest {

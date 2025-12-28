@@ -59,6 +59,18 @@ public class TransactionExceptionHandler {
         return build(HttpStatus.FORBIDDEN, "Access denied: " + ex.getMessage(), request);
     }
 
+    @ExceptionHandler(com.openwallet.ledger.exception.LimitExceededException.class)
+    @ResponseBody
+    public ResponseEntity<ApiError> handleLimitExceeded(com.openwallet.ledger.exception.LimitExceededException ex, HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(com.openwallet.ledger.exception.WalletNotFoundException.class)
+    @ResponseBody
+    public ResponseEntity<ApiError> handleWalletNotFound(com.openwallet.ledger.exception.WalletNotFoundException ex, HttpServletRequest request) {
+        return build(HttpStatus.NOT_FOUND, ex.getMessage(), request);
+    }
+
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {
         return build(status, message, request, null);
     }

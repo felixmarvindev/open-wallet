@@ -35,6 +35,7 @@ public class TransactionService {
     private final LedgerEntryRepository ledgerEntryRepository;
     private final TransactionEventProducer transactionEventProducer;
     private final LedgerEntryService ledgerEntryService;
+    private final TransactionLimitService transactionLimitService;
 
     @Transactional
     public TransactionResponse createDeposit(DepositRequest request) {
@@ -88,6 +89,13 @@ public class TransactionService {
             return toResponse(existing);
         }
 
+        // Validate transaction limits before creating transaction
+        transactionLimitService.validateTransactionLimits(
+                request.getFromWalletId(), 
+                request.getAmount(), 
+                TransactionType.WITHDRAWAL
+        );
+
         Transaction tx = Transaction.builder()
                 .transactionType(TransactionType.WITHDRAWAL)
                 .amount(request.getAmount())
@@ -128,6 +136,18 @@ public class TransactionService {
         if (existing != null) {
             return toResponse(existing);
         }
+
+        // Validate transaction limits for both wallets (from and to)
+        transactionLimitService.validateTransactionLimits(
+                request.getFromWalletId(), 
+                request.getAmount(), 
+                TransactionType.TRANSFER
+        );
+        transactionLimitService.validateTransactionLimits(
+                request.getToWalletId(), 
+                request.getAmount(), 
+                TransactionType.TRANSFER
+        );
 
         Transaction tx = Transaction.builder()
                 .transactionType(TransactionType.TRANSFER)
