@@ -4,10 +4,13 @@ import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.cache.BalanceCacheService.BalanceSnapshot;
 import com.openwallet.wallet.domain.Transaction;
 import com.openwallet.wallet.domain.Wallet;
+import com.openwallet.wallet.domain.WalletStatus;
 import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.TransactionListResponse;
 import com.openwallet.wallet.dto.WalletResponse;
+import com.openwallet.wallet.events.WalletEvent;
+import com.openwallet.wallet.events.WalletEventProducer;
 import com.openwallet.wallet.exception.InsufficientBalanceException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.TransactionRepository;
@@ -37,6 +40,7 @@ public class WalletService {
     private final WalletRepository walletRepository;
     private final BalanceCacheService balanceCacheService;
     private final TransactionRepository transactionRepository;
+    private final WalletEventProducer walletEventProducer;
 
     @Transactional
     public WalletResponse createWallet(Long customerId, CreateWalletRequest request) {
@@ -228,6 +232,88 @@ public class WalletService {
                 .completedAt(tx.getCompletedAt() != null ? tx.getCompletedAt().toString() : null)
                 .failureReason(tx.getFailureReason())
                 .build();
+    }
+
+    /**
+     * Suspends a wallet, preventing transactions.
+     * Only the wallet owner or an admin can suspend a wallet.
+     *
+     * @param walletId Wallet ID to suspend
+     * @param customerId Customer ID (for ownership validation)
+     * @return Updated wallet response
+     * @throws WalletNotFoundException if wallet not found
+     * @throws IllegalStateException if wallet is already suspended or closed
+     */
+    @Transactional
+    public WalletResponse suspendWallet(Long walletId, Long customerId) {
+        Wallet wallet = walletRepository.findByCustomerIdAndId(customerId, walletId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
+
+        if (wallet.getStatus() == WalletStatus.SUSPENDED) {
+            throw new IllegalStateException("Wallet is already suspended");
+        }
+
+        if (wallet.getStatus() == WalletStatus.CLOSED) {
+            throw new IllegalStateException("Cannot suspend a closed wallet");
+        }
+
+        WalletStatus previousStatus = wallet.getStatus();
+        wallet.setStatus(WalletStatus.SUSPENDED);
+        Wallet saved = walletRepository.save(wallet);
+
+        log.info("Wallet suspended: walletId={}, customerId={}, previousStatus={}", 
+                walletId, customerId, previousStatus);
+
+        // Publish WALLET_SUSPENDED event
+        WalletEvent event = WalletEvent.builder()
+                .walletId(saved.getId())
+                .customerId(saved.getCustomerId())
+                .eventType("WALLET_SUSPENDED")
+                .balance(saved.getBalance())
+                .currency(saved.getCurrency())
+                .timestamp(LocalDateTime.now())
+                .build();
+        walletEventProducer.publish(event);
+
+        return toResponse(saved);
+    }
+
+    /**
+     * Activates a suspended wallet, allowing transactions again.
+     * Only the wallet owner or an admin can activate a wallet.
+     *
+     * @param walletId Wallet ID to activate
+     * @param customerId Customer ID (for ownership validation)
+     * @return Updated wallet response
+     * @throws WalletNotFoundException if wallet not found
+     * @throws IllegalStateException if wallet is not suspended
+     */
+    @Transactional
+    public WalletResponse activateWallet(Long walletId, Long customerId) {
+        Wallet wallet = walletRepository.findByCustomerIdAndId(customerId, walletId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
+
+        if (wallet.getStatus() != WalletStatus.SUSPENDED) {
+            throw new IllegalStateException("Wallet is not suspended. Current status: " + wallet.getStatus());
+        }
+
+        wallet.setStatus(WalletStatus.ACTIVE);
+        Wallet saved = walletRepository.save(wallet);
+
+        log.info("Wallet activated: walletId={}, customerId={}", walletId, customerId);
+
+        // Publish WALLET_ACTIVATED event
+        WalletEvent event = WalletEvent.builder()
+                .walletId(saved.getId())
+                .customerId(saved.getCustomerId())
+                .eventType("WALLET_ACTIVATED")
+                .balance(saved.getBalance())
+                .currency(saved.getCurrency())
+                .timestamp(LocalDateTime.now())
+                .build();
+        walletEventProducer.publish(event);
+
+        return toResponse(saved);
     }
 
     /**

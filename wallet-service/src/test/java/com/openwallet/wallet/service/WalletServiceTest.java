@@ -3,9 +3,11 @@ package com.openwallet.wallet.service;
 import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.config.JpaConfig;
 import com.openwallet.wallet.domain.Wallet;
+import com.openwallet.wallet.domain.WalletStatus;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.TransactionListResponse;
 import com.openwallet.wallet.dto.WalletResponse;
+import com.openwallet.wallet.events.WalletEventProducer;
 import com.openwallet.wallet.exception.WalletAlreadyExistsException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.TransactionRepository;
@@ -46,6 +48,9 @@ class WalletServiceTest {
 
     @MockBean
     private BalanceCacheService balanceCacheService;
+
+    @MockBean
+    private WalletEventProducer walletEventProducer;
 
     @Test
     void createWalletShouldSucceed() {
@@ -365,5 +370,106 @@ class WalletServiceTest {
                 "DEPOSIT".equals(tx.getTransactionType()) &&
                 "COMPLETED".equals(tx.getStatus())
         );
+    }
+
+    @Test
+    void suspendWalletShouldChangeStatusToSuspended() {
+        // Given: Active wallet
+        Wallet wallet = walletRepository.save(Wallet.builder()
+                .customerId(1L)
+                .currency("KES")
+                .status(WalletStatus.ACTIVE)
+                .balance(new BigDecimal("100.00"))
+                .build());
+
+        // When: Suspending wallet
+        WalletResponse response = walletService.suspendWallet(wallet.getId(), 1L);
+
+        // Then: Status should be SUSPENDED
+        assertThat(response.getStatus()).isEqualTo("SUSPENDED");
+        
+        // Verify in database
+        Wallet updated = walletRepository.findById(wallet.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(WalletStatus.SUSPENDED);
+    }
+
+    @Test
+    void suspendWalletShouldThrowWhenWalletNotFound() {
+        assertThatThrownBy(() -> walletService.suspendWallet(999L, 1L))
+                .isInstanceOf(WalletNotFoundException.class)
+                .hasMessageContaining("Wallet not found");
+    }
+
+    @Test
+    void suspendWalletShouldThrowWhenAlreadySuspended() {
+        // Given: Suspended wallet
+        Wallet wallet = walletRepository.save(Wallet.builder()
+                .customerId(1L)
+                .currency("KES")
+                .status(WalletStatus.SUSPENDED)
+                .build());
+
+        // When/Then: Trying to suspend again should throw
+        assertThatThrownBy(() -> walletService.suspendWallet(wallet.getId(), 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("already suspended");
+    }
+
+    @Test
+    void suspendWalletShouldThrowWhenWalletIsClosed() {
+        // Given: Closed wallet
+        Wallet wallet = walletRepository.save(Wallet.builder()
+                .customerId(1L)
+                .currency("KES")
+                .status(WalletStatus.CLOSED)
+                .build());
+
+        // When/Then: Trying to suspend closed wallet should throw
+        assertThatThrownBy(() -> walletService.suspendWallet(wallet.getId(), 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot suspend a closed wallet");
+    }
+
+    @Test
+    void activateWalletShouldChangeStatusToActive() {
+        // Given: Suspended wallet
+        Wallet wallet = walletRepository.save(Wallet.builder()
+                .customerId(1L)
+                .currency("KES")
+                .status(WalletStatus.SUSPENDED)
+                .balance(new BigDecimal("100.00"))
+                .build());
+
+        // When: Activating wallet
+        WalletResponse response = walletService.activateWallet(wallet.getId(), 1L);
+
+        // Then: Status should be ACTIVE
+        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        
+        // Verify in database
+        Wallet updated = walletRepository.findById(wallet.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(WalletStatus.ACTIVE);
+    }
+
+    @Test
+    void activateWalletShouldThrowWhenWalletNotFound() {
+        assertThatThrownBy(() -> walletService.activateWallet(999L, 1L))
+                .isInstanceOf(WalletNotFoundException.class)
+                .hasMessageContaining("Wallet not found");
+    }
+
+    @Test
+    void activateWalletShouldThrowWhenNotSuspended() {
+        // Given: Active wallet
+        Wallet wallet = walletRepository.save(Wallet.builder()
+                .customerId(1L)
+                .currency("KES")
+                .status(WalletStatus.ACTIVE)
+                .build());
+
+        // When/Then: Trying to activate active wallet should throw
+        assertThatThrownBy(() -> walletService.activateWallet(wallet.getId(), 1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not suspended");
     }
 }

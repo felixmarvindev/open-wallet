@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @Import({ com.openwallet.ledger.config.JpaConfig.class, TransactionService.class, LedgerEntryService.class, 
-         WalletLimitsService.class, TransactionLimitService.class })
+         WalletLimitsService.class, TransactionLimitService.class, WalletStatusService.class })
 @ActiveProfiles("test")
 @Sql(scripts = "/sql/create_wallets_table.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @SuppressWarnings({ "ConstantConditions", "DataFlowIssue", "null" })
@@ -57,10 +57,14 @@ class TransactionServiceTest {
     private TransactionEventProducer transactionEventProducer;
 
     private void createTestWallet(Long walletId, BigDecimal dailyLimit, BigDecimal monthlyLimit) {
+        createTestWallet(walletId, dailyLimit, monthlyLimit, "ACTIVE");
+    }
+
+    private void createTestWallet(Long walletId, BigDecimal dailyLimit, BigDecimal monthlyLimit, String status) {
         jdbcTemplate.update(
             "INSERT INTO wallets (id, customer_id, currency, balance, daily_limit, monthly_limit, status) " +
-            "VALUES (?, 1, 'KES', 0.00, ?, ?, 'ACTIVE')",
-            walletId, dailyLimit, monthlyLimit
+            "VALUES (?, 1, 'KES', 0.00, ?, ?, ?)",
+            walletId, dailyLimit, monthlyLimit, status
         );
     }
 
@@ -741,5 +745,104 @@ class TransactionServiceTest {
                 (tx.getToWalletId() != null && tx.getToWalletId().equals(1200L) ||
                  tx.getFromWalletId() != null && tx.getFromWalletId().equals(1200L))
         );
+    }
+
+    @Test
+    void createDepositShouldRejectSuspendedWallet() {
+        // Given: Suspended wallet
+        createTestWallet(2000L, new BigDecimal("100000"), new BigDecimal("1000000"), "SUSPENDED");
+
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(2000L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("dep-suspended-1")
+                .build();
+
+        // When/Then: Should reject transaction
+        assertThatThrownBy(() -> transactionService.createDeposit(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUSPENDED")
+                .hasMessageContaining("cannot process transactions");
+    }
+
+    @Test
+    void createWithdrawalShouldRejectSuspendedWallet() {
+        // Given: Suspended wallet
+        createTestWallet(2001L, new BigDecimal("100000"), new BigDecimal("1000000"), "SUSPENDED");
+
+        WithdrawalRequest request = WithdrawalRequest.builder()
+                .fromWalletId(2001L)
+                .amount(new BigDecimal("50.00"))
+                .currency("KES")
+                .idempotencyKey("wd-suspended-1")
+                .build();
+
+        // When/Then: Should reject transaction
+        assertThatThrownBy(() -> transactionService.createWithdrawal(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUSPENDED")
+                .hasMessageContaining("cannot process transactions");
+    }
+
+    @Test
+    void createTransferShouldRejectSuspendedFromWallet() {
+        // Given: Active and suspended wallets
+        createTestWallet(2002L, new BigDecimal("100000"), new BigDecimal("1000000"), "SUSPENDED");
+        createTestWallet(2003L, new BigDecimal("100000"), new BigDecimal("1000000"), "ACTIVE");
+
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(2002L)
+                .toWalletId(2003L)
+                .amount(new BigDecimal("25.00"))
+                .currency("KES")
+                .idempotencyKey("tr-suspended-from-1")
+                .build();
+
+        // When/Then: Should reject transaction
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUSPENDED")
+                .hasMessageContaining("cannot process transactions");
+    }
+
+    @Test
+    void createTransferShouldRejectSuspendedToWallet() {
+        // Given: Active and suspended wallets
+        createTestWallet(2004L, new BigDecimal("100000"), new BigDecimal("1000000"), "ACTIVE");
+        createTestWallet(2005L, new BigDecimal("100000"), new BigDecimal("1000000"), "SUSPENDED");
+
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(2004L)
+                .toWalletId(2005L)
+                .amount(new BigDecimal("25.00"))
+                .currency("KES")
+                .idempotencyKey("tr-suspended-to-1")
+                .build();
+
+        // When/Then: Should reject transaction
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUSPENDED")
+                .hasMessageContaining("cannot process transactions");
+    }
+
+    @Test
+    void createDepositShouldRejectClosedWallet() {
+        // Given: Closed wallet
+        createTestWallet(2006L, new BigDecimal("100000"), new BigDecimal("1000000"), "CLOSED");
+
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(2006L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("dep-closed-1")
+                .build();
+
+        // When/Then: Should reject transaction
+        assertThatThrownBy(() -> transactionService.createDeposit(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("CLOSED")
+                .hasMessageContaining("cannot process transactions");
     }
 }

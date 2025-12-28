@@ -7,6 +7,7 @@ import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.service.BalanceReconciliationService;
 import com.openwallet.wallet.service.CustomerIdResolver;
 import com.openwallet.wallet.service.WalletService;
+import org.mockito.MockedStatic;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -287,6 +288,40 @@ class WalletControllerTest {
                 .param("size", "20"))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(response)));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/wallets/{id}/suspend returns 200")
+    void suspendWalletShouldReturnOk() throws Exception {
+        try (MockedStatic<JwtUtils> jwtUtilsMock = Mockito.mockStatic(JwtUtils.class)) {
+            jwtUtilsMock.when(JwtUtils::getUserId).thenReturn("test-user-id");
+
+            WalletResponse response = sampleResponse(5L, "KES");
+            response.setStatus("SUSPENDED");
+            Mockito.when(walletService.suspendWallet(5L, 10L)).thenReturn(response);
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/wallets/5/suspend")
+                    .header("X-Customer-Id", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json(objectMapper.writeValueAsString(response)));
+        }
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/wallets/{id}/activate returns 200")
+    void activateWalletShouldReturnOk() throws Exception {
+        try (MockedStatic<JwtUtils> jwtUtilsMock = Mockito.mockStatic(JwtUtils.class)) {
+            jwtUtilsMock.when(JwtUtils::getUserId).thenReturn("test-user-id");
+
+            WalletResponse response = sampleResponse(5L, "KES");
+            response.setStatus("ACTIVE");
+            Mockito.when(walletService.activateWallet(5L, 10L)).thenReturn(response);
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1/wallets/5/activate")
+                    .header("X-Customer-Id", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json(objectMapper.writeValueAsString(response)));
         }
     }
 

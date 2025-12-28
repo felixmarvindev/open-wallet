@@ -43,6 +43,7 @@ public class TransactionService {
     private final TransactionEventProducer transactionEventProducer;
     private final LedgerEntryService ledgerEntryService;
     private final TransactionLimitService transactionLimitService;
+    private final WalletStatusService walletStatusService;
 
     @Transactional
     public TransactionResponse createDeposit(DepositRequest request) {
@@ -54,6 +55,9 @@ public class TransactionService {
         if (existing != null) {
             return toResponse(existing);
         }
+
+        // Validate wallet is active before processing transaction
+        walletStatusService.validateWalletActive(request.getToWalletId());
 
         // Validate transaction limits before creating transaction
         transactionLimitService.validateTransactionLimits(
@@ -103,6 +107,9 @@ public class TransactionService {
             return toResponse(existing);
         }
 
+        // Validate wallet is active before processing transaction
+        walletStatusService.validateWalletActive(request.getFromWalletId());
+
         // Validate transaction limits before creating transaction
         transactionLimitService.validateTransactionLimits(
                 request.getFromWalletId(), 
@@ -150,6 +157,10 @@ public class TransactionService {
         if (existing != null) {
             return toResponse(existing);
         }
+
+        // Validate both wallets are active before processing transaction
+        walletStatusService.validateWalletActive(request.getFromWalletId());
+        walletStatusService.validateWalletActive(request.getToWalletId());
 
         // Validate transaction limits for both wallets (from and to)
         transactionLimitService.validateTransactionLimits(

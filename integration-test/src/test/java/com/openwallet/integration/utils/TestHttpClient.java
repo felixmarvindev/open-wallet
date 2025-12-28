@@ -126,19 +126,25 @@ public class TestHttpClient {
      * Makes a PUT request with JSON body and optional authorization token.
      */
     public HttpResponse put(String path, Object body, String authToken) throws IOException {
-        String jsonBody = objectMapper.writeValueAsString(body);
-        
         Request.Builder requestBuilder = new Request.Builder()
-                .url(baseUrl + path)
-                .put(RequestBody.create(jsonBody, MediaType.get("application/json")))
-                .addHeader("Content-Type", "application/json");
+                .url(baseUrl + path);
+        
+        if (body != null) {
+            String jsonBody = objectMapper.writeValueAsString(body);
+            requestBuilder.put(RequestBody.create(jsonBody, MediaType.get("application/json")))
+                    .addHeader("Content-Type", "application/json");
+            log.debug("PUT {} -> {}", path, jsonBody);
+        } else {
+            requestBuilder.put(RequestBody.create("{}", MediaType.get("application/json")))
+                    .addHeader("Content-Type", "application/json");
+            log.debug("PUT {} -> {}", path, "{}");
+        }
         
         if (authToken != null) {
             requestBuilder.addHeader("Authorization", "Bearer " + authToken);
         }
         
         Request request = requestBuilder.build();
-        log.debug("PUT {} -> {}", path, jsonBody);
         
         try (Response response = httpClient.newCall(request).execute()) {
             String responseBody = response.body() != null ? response.body().string() : null;

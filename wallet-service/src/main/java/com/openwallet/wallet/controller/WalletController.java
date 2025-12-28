@@ -17,6 +17,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -115,6 +116,28 @@ public class WalletController {
                 sortBy,
                 sortDirection
         );
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/suspend")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<WalletResponse> suspendWallet(
+            @PathVariable("id") Long walletId,
+            @RequestHeader(value = "X-Customer-Id", required = false) Long headerCustomerId
+    ) {
+        Long customerId = resolveCustomerId(headerCustomerId);
+        WalletResponse response = walletService.suspendWallet(walletId, customerId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}/activate")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+    public ResponseEntity<WalletResponse> activateWallet(
+            @PathVariable("id") Long walletId,
+            @RequestHeader(value = "X-Customer-Id", required = false) Long headerCustomerId
+    ) {
+        Long customerId = resolveCustomerId(headerCustomerId);
+        WalletResponse response = walletService.activateWallet(walletId, customerId);
         return ResponseEntity.ok(response);
     }
 
