@@ -16,7 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -25,8 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
-@Import({ com.openwallet.ledger.config.JpaConfig.class, TransactionService.class, LedgerEntryService.class })
+@Import({ com.openwallet.ledger.config.JpaConfig.class, TransactionService.class, LedgerEntryService.class, 
+         WalletLimitsService.class, TransactionLimitService.class })
 @ActiveProfiles("test")
+@Sql(scripts = "/sql/create_wallets_table.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @SuppressWarnings({ "ConstantConditions", "DataFlowIssue", "null" })
 class TransactionServiceTest {
 
@@ -39,11 +43,25 @@ class TransactionServiceTest {
     @Autowired
     private LedgerEntryRepository ledgerEntryRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockBean
     private TransactionEventProducer transactionEventProducer;
 
+    private void createTestWallet(Long walletId, BigDecimal dailyLimit, BigDecimal monthlyLimit) {
+        jdbcTemplate.update(
+            "INSERT INTO wallets (id, customer_id, currency, balance, daily_limit, monthly_limit, status) " +
+            "VALUES (?, 1, 'KES', 0.00, ?, ?, 'ACTIVE')",
+            walletId, dailyLimit, monthlyLimit
+        );
+    }
+
     @Test
     void createDepositShouldPersistTransactionAndEntries() {
+        // Setup: Create test wallet with high limits
+        createTestWallet(20L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(20L)
                 .amount(new BigDecimal("100.00"))
@@ -63,6 +81,9 @@ class TransactionServiceTest {
 
     @Test
     void createWithdrawalShouldPersistTransactionAndEntries() {
+        // Setup: Create test wallet with high limits
+        createTestWallet(21L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         WithdrawalRequest request = WithdrawalRequest.builder()
                 .fromWalletId(21L)
                 .amount(new BigDecimal("50.00"))
@@ -81,6 +102,10 @@ class TransactionServiceTest {
 
     @Test
     void createTransferShouldPersistTransactionAndEntries() {
+        // Setup: Create test wallets with high limits
+        createTestWallet(30L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(31L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         TransferRequest request = TransferRequest.builder()
                 .fromWalletId(30L)
                 .toWalletId(31L)
@@ -143,6 +168,9 @@ class TransactionServiceTest {
 
     @Test
     void idempotencyShouldReturnExistingTransaction() {
+        // Setup: Create test wallet with high limits
+        createTestWallet(50L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(50L)
                 .amount(new BigDecimal("10.00"))
@@ -248,5 +276,73 @@ class TransactionServiceTest {
         assertThatThrownBy(() -> transactionService.createDeposit(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Amount must be greater than 0");
+    }
+
+    @Test
+    void createDepositShouldThrowWhenDailyLimitExceeded() {
+        // Setup: Create test wallet with low daily limit
+        createTestWallet(100L, new BigDecimal("100.00"), new BigDecimal("10000.00"));
+
+        // First transaction uses up most of the limit
+        DepositRequest firstRequest = DepositRequest.builder()
+                .toWalletId(100L)
+                .amount(new BigDecimal("90.00"))
+                .currency("KES")
+                .idempotencyKey("dep-limit-1")
+                .build();
+        transactionService.createDeposit(firstRequest);
+
+        // Second transaction should exceed daily limit
+        DepositRequest secondRequest = DepositRequest.builder()
+                .toWalletId(100L)
+                .amount(new BigDecimal("20.00"))
+                .currency("KES")
+                .idempotencyKey("dep-limit-2")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createDeposit(secondRequest))
+                .isInstanceOf(com.openwallet.ledger.exception.LimitExceededException.class)
+                .hasMessageContaining("DAILY limit");
+    }
+
+    @Test
+    void createDepositShouldThrowWhenMonthlyLimitExceeded() {
+        // Setup: Create test wallet with low monthly limit
+        createTestWallet(101L, new BigDecimal("10000.00"), new BigDecimal("1000.00"));
+
+        // First transaction uses up most of the monthly limit
+        DepositRequest firstRequest = DepositRequest.builder()
+                .toWalletId(101L)
+                .amount(new BigDecimal("950.00"))
+                .currency("KES")
+                .idempotencyKey("dep-monthly-1")
+                .build();
+        transactionService.createDeposit(firstRequest);
+
+        // Second transaction should exceed monthly limit
+        DepositRequest secondRequest = DepositRequest.builder()
+                .toWalletId(101L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("dep-monthly-2")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createDeposit(secondRequest))
+                .isInstanceOf(com.openwallet.ledger.exception.LimitExceededException.class)
+                .hasMessageContaining("MONTHLY limit");
+    }
+
+    @Test
+    void createDepositShouldThrowWhenWalletNotFound() {
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(999L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("dep-missing-wallet")
+                .build();
+
+        assertThatThrownBy(() -> transactionService.createDeposit(request))
+                .isInstanceOf(com.openwallet.ledger.exception.WalletNotFoundException.class)
+                .hasMessageContaining("Wallet not found");
     }
 }

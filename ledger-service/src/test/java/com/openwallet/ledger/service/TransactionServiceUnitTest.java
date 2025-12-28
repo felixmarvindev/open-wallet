@@ -51,6 +51,9 @@ class TransactionServiceUnitTest {
     @Mock
     private LedgerEntryService ledgerEntryService;
 
+    @Mock
+    private TransactionLimitService transactionLimitService;
+
     @InjectMocks
     private TransactionService transactionService;
 
@@ -84,6 +87,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-1")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
         when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -167,6 +171,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-fail")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
         when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class)))
@@ -220,6 +225,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("wd-1")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(withdrawalTx);
         when(ledgerEntryService.calculateBalanceFromLedger(21L)).thenReturn(new BigDecimal("100.00"));
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -283,6 +289,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("tr-1")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(transferTx);
         when(ledgerEntryService.calculateBalanceFromLedger(30L)).thenReturn(new BigDecimal("100.00"));
         when(ledgerEntryService.calculateBalanceFromLedger(31L)).thenReturn(BigDecimal.ZERO);
@@ -436,6 +443,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-currency")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
             Transaction tx = invocation.getArgument(0);
             tx.setId(1L);
@@ -463,6 +471,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-null-currency")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
             Transaction tx = invocation.getArgument(0);
             tx.setId(1L);
@@ -581,6 +590,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-event-fail")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
         when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -610,6 +620,7 @@ class TransactionServiceUnitTest {
                 .build();
 
         when(transactionRepository.findByIdempotencyKey("dep-entries")).thenReturn(Optional.empty());
+        doNothing().when(transactionLimitService).validateTransactionLimits(any(), any(), any());
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
         when(ledgerEntryService.calculateBalanceFromLedger(20L)).thenReturn(BigDecimal.ZERO);
         when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));

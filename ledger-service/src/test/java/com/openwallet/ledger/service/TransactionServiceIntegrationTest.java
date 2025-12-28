@@ -15,8 +15,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.verify;
 @ActiveProfiles("test")
 @Transactional
 @Rollback
+@Sql(scripts = "/sql/create_wallets_table.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class TransactionServiceIntegrationTest {
 
     @Autowired
@@ -43,11 +46,25 @@ class TransactionServiceIntegrationTest {
     @Autowired
     private LedgerEntryRepository ledgerEntryRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @MockBean
     private TransactionEventProducer transactionEventProducer;
 
+    private void createTestWallet(Long walletId, BigDecimal dailyLimit, BigDecimal monthlyLimit) {
+        jdbcTemplate.update(
+            "INSERT INTO wallets (id, customer_id, currency, balance, daily_limit, monthly_limit, status) " +
+            "VALUES (?, 1, 'KES', 0.00, ?, ?, 'ACTIVE')",
+            walletId, dailyLimit, monthlyLimit
+        );
+    }
+
     @Test
     void depositCreatesDoubleEntryAndCompletes() {
+        // Setup: Create test wallet with high limits
+        createTestWallet(200L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(200L)
                 .amount(new BigDecimal("50.00"))
@@ -87,6 +104,10 @@ class TransactionServiceIntegrationTest {
 
     @Test
     void transferCreatesDoubleEntryAndCompletes() {
+        // Setup: Create test wallets with high limits
+        createTestWallet(201L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(202L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         TransferRequest request = TransferRequest.builder()
                 .fromWalletId(201L)
                 .toWalletId(202L)
@@ -127,6 +148,9 @@ class TransactionServiceIntegrationTest {
 
     @Test
     void idempotencyReturnsExistingTransaction() {
+        // Setup: Create test wallet with high limits
+        createTestWallet(300L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(300L)
                 .amount(new BigDecimal("10.00"))
