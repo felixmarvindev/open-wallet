@@ -11,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 
 /**
  * Service for validating transaction limits before processing transactions.
@@ -20,6 +22,8 @@ import java.time.LocalTime;
  * Validates that a transaction would not exceed the wallet's daily or monthly limits.
  * Limits are retrieved from the wallets table (read-only access).
  * Current usage is calculated from completed transactions in the transactions table.
+ * 
+ * Uses Clock abstraction to allow time injection for testing.
  */
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ public class TransactionLimitService {
 
     private final TransactionRepository transactionRepository;
     private final WalletLimitsService walletLimitsService;
+    private final Clock clock;
 
     /**
      * Validates that a transaction would not exceed wallet limits.
@@ -58,8 +63,8 @@ public class TransactionLimitService {
         WalletLimits limits = walletLimitsService.getWalletLimits(walletId)
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found: " + walletId));
 
-        // Calculate current usage
-        LocalDateTime now = LocalDateTime.now();
+        // Calculate current usage using injected clock (allows time manipulation in tests)
+        LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime startOfDay = now.toLocalDate().atStartOfDay();
         LocalDateTime startOfMonth = now.withDayOfMonth(1).with(LocalTime.MIN);
         // Use now as end time (inclusive) to include all transactions up to current moment
