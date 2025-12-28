@@ -48,6 +48,13 @@ public class TransactionService {
             return toResponse(existing);
         }
 
+        // Validate transaction limits before creating transaction
+        transactionLimitService.validateTransactionLimits(
+                request.getToWalletId(), 
+                request.getAmount(), 
+                TransactionType.DEPOSIT
+        );
+
         Transaction tx = Transaction.builder()
                 .transactionType(TransactionType.DEPOSIT)
                 .amount(request.getAmount())

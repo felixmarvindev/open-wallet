@@ -62,6 +62,8 @@ public class TransactionLimitService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfDay = now.toLocalDate().atStartOfDay();
         LocalDateTime startOfMonth = now.withDayOfMonth(1).with(LocalTime.MIN);
+        // Use now as end time (inclusive) to include all transactions up to current moment
+        // Note: Query uses <= so transactions at exact same timestamp are included
 
         BigDecimal dailyUsage = transactionRepository.sumTransactionAmountsByWalletAndDateRange(
                 walletId, startOfDay, now);

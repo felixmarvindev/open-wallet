@@ -41,7 +41,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            "WHERE (t.fromWalletId = :walletId OR t.toWalletId = :walletId) " +
            "AND t.status = 'COMPLETED' " +
            "AND t.initiatedAt >= :from " +
-           "AND t.initiatedAt < :to")
+           "AND t.initiatedAt <= :to")
     BigDecimal sumTransactionAmountsByWalletAndDateRange(
             @Param("walletId") Long walletId,
             @Param("from") LocalDateTime from,

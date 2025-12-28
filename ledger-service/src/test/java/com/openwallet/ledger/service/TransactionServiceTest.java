@@ -14,6 +14,7 @@ import com.openwallet.ledger.repository.TransactionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -45,6 +46,9 @@ class TransactionServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private TestEntityManager testEntityManager;
 
     @MockBean
     private TransactionEventProducer transactionEventProducer;
@@ -291,8 +295,12 @@ class TransactionServiceTest {
                 .idempotencyKey("dep-limit-1")
                 .build();
         transactionService.createDeposit(firstRequest);
+        
+        // Flush to ensure first transaction is visible to limit query
+        testEntityManager.flush();
+        testEntityManager.clear();
 
-        // Second transaction should exceed daily limit
+        // Second transaction should exceed daily limit (90 + 20 = 110 > 100)
         DepositRequest secondRequest = DepositRequest.builder()
                 .toWalletId(100L)
                 .amount(new BigDecimal("20.00"))
@@ -318,8 +326,12 @@ class TransactionServiceTest {
                 .idempotencyKey("dep-monthly-1")
                 .build();
         transactionService.createDeposit(firstRequest);
+        
+        // Flush to ensure first transaction is visible to limit query
+        testEntityManager.flush();
+        testEntityManager.clear();
 
-        // Second transaction should exceed monthly limit
+        // Second transaction should exceed monthly limit (950 + 100 = 1050 > 1000)
         DepositRequest secondRequest = DepositRequest.builder()
                 .toWalletId(101L)
                 .amount(new BigDecimal("100.00"))
