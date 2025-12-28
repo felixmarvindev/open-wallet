@@ -1,12 +1,16 @@
 package com.openwallet.ledger.controller;
 
+import com.openwallet.ledger.domain.TransactionStatus;
+import com.openwallet.ledger.domain.TransactionType;
 import com.openwallet.ledger.dto.DepositRequest;
+import com.openwallet.ledger.dto.TransactionListResponse;
 import com.openwallet.ledger.dto.TransactionResponse;
 import com.openwallet.ledger.dto.TransferRequest;
 import com.openwallet.ledger.dto.WithdrawalRequest;
 import com.openwallet.ledger.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,7 +19,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/transactions")
@@ -49,6 +56,33 @@ public class TransactionController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'AUDITOR')")
     public ResponseEntity<TransactionResponse> getTransaction(@PathVariable("id") Long id) {
         TransactionResponse response = transactionService.getTransaction(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'AUDITOR')")
+    public ResponseEntity<TransactionListResponse> getTransactions(
+            @RequestParam(required = false) Long walletId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(required = false) TransactionStatus status,
+            @RequestParam(required = false) TransactionType transactionType,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        TransactionListResponse response = transactionService.getTransactions(
+                walletId,
+                fromDate,
+                toDate,
+                status,
+                transactionType,
+                page,
+                size,
+                sortBy,
+                sortDirection
+        );
         return ResponseEntity.ok(response);
     }
 }

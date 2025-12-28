@@ -2,15 +2,22 @@ package com.openwallet.wallet.service;
 
 import com.openwallet.wallet.cache.BalanceCacheService;
 import com.openwallet.wallet.cache.BalanceCacheService.BalanceSnapshot;
+import com.openwallet.wallet.domain.Transaction;
 import com.openwallet.wallet.domain.Wallet;
 import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.CreateWalletRequest;
+import com.openwallet.wallet.dto.TransactionListResponse;
 import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.exception.InsufficientBalanceException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
+import com.openwallet.wallet.repository.TransactionRepository;
 import com.openwallet.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -29,6 +36,7 @@ public class WalletService {
 
     private final WalletRepository walletRepository;
     private final BalanceCacheService balanceCacheService;
+    private final TransactionRepository transactionRepository;
 
     @Transactional
     public WalletResponse createWallet(Long customerId, CreateWalletRequest request) {
@@ -106,6 +114,115 @@ public class WalletService {
                             return response;
                         })
                         .orElseThrow(() -> new WalletNotFoundException("Wallet not found")));
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionListResponse getWalletTransactions(
+            Long walletId,
+            Long customerId,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            String status,
+            String transactionType,
+            Integer page,
+            Integer size,
+            String sortBy,
+            String sortDirection
+    ) {
+        // Validate wallet ownership
+        walletRepository.findByCustomerIdAndId(customerId, walletId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet not found"));
+
+        // Default pagination values
+        int pageNumber = (page != null && page >= 0) ? page : 0;
+        // Default to 20 if null or <= 0, cap at 100 if > 100
+        int pageSize = (size == null || size <= 0) ? 20 : Math.min(size, 100);
+
+        // Default sorting: by initiatedAt descending (newest first)
+        Sort sort = Sort.by(Sort.Direction.DESC, "initiatedAt");
+        if (sortBy != null && !sortBy.trim().isEmpty()) {
+            Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) 
+                    ? Sort.Direction.ASC 
+                    : Sort.Direction.DESC;
+            
+            // Validate sort field
+            String validSortBy = validateSortField(sortBy);
+            sort = Sort.by(direction, validSortBy);
+        }
+
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
+
+        // Query transactions directly from database (read-only access)
+        Page<Transaction> transactionPage = transactionRepository.findTransactionsWithFilters(
+                walletId,
+                fromDate,
+                toDate,
+                status,
+                transactionType,
+                pageable
+        );
+
+        // Convert to response
+        List<TransactionListResponse.TransactionItem> transactionItems = transactionPage.getContent().stream()
+                .map(this::toTransactionItem)
+                .collect(Collectors.toList());
+
+        // Build pagination metadata
+        TransactionListResponse.PaginationMetadata pagination = TransactionListResponse.PaginationMetadata.builder()
+                .page(transactionPage.getNumber())
+                .size(transactionPage.getSize())
+                .totalElements(transactionPage.getTotalElements())
+                .totalPages(transactionPage.getTotalPages())
+                .hasNext(transactionPage.hasNext())
+                .hasPrevious(transactionPage.hasPrevious())
+                .build();
+
+        return TransactionListResponse.builder()
+                .transactions(transactionItems)
+                .pagination(pagination)
+                .build();
+    }
+
+    /**
+     * Validates and normalizes sort field name.
+     * Only allows sorting by safe fields to prevent SQL injection.
+     */
+    private String validateSortField(String sortBy) {
+        String normalized = sortBy.trim().toLowerCase();
+        // Allowed sort fields
+        switch (normalized) {
+            case "id":
+            case "initiatedat":
+            case "completedat":
+            case "amount":
+            case "status":
+            case "transactiontype":
+                return normalized.equals("initiatedat") ? "initiatedAt" :
+                       normalized.equals("completedat") ? "completedAt" :
+                       normalized.equals("transactiontype") ? "transactionType" :
+                       normalized;
+            default:
+                log.warn("Invalid sort field '{}', defaulting to 'initiatedAt'", sortBy);
+                return "initiatedAt";
+        }
+    }
+
+    /**
+     * Converts Transaction entity to TransactionItem DTO.
+     */
+    private TransactionListResponse.TransactionItem toTransactionItem(Transaction tx) {
+        return TransactionListResponse.TransactionItem.builder()
+                .id(tx.getId())
+                .transactionType(tx.getTransactionType())
+                .status(tx.getStatus())
+                .amount(tx.getAmount())
+                .currency(tx.getCurrency())
+                .fromWalletId(tx.getFromWalletId())
+                .toWalletId(tx.getToWalletId())
+                .initiatedAt(tx.getInitiatedAt() != null ? tx.getInitiatedAt().toString() : null)
+                .completedAt(tx.getCompletedAt() != null ? tx.getCompletedAt().toString() : null)
+                .failureReason(tx.getFailureReason())
+                .build();
     }
 
     /**

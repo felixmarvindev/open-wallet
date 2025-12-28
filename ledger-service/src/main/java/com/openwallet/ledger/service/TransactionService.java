@@ -6,6 +6,7 @@ import com.openwallet.ledger.domain.Transaction;
 import com.openwallet.ledger.domain.TransactionStatus;
 import com.openwallet.ledger.domain.TransactionType;
 import com.openwallet.ledger.dto.DepositRequest;
+import com.openwallet.ledger.dto.TransactionListResponse;
 import com.openwallet.ledger.dto.TransactionResponse;
 import com.openwallet.ledger.dto.TransferRequest;
 import com.openwallet.ledger.dto.WithdrawalRequest;
@@ -16,14 +17,20 @@ import com.openwallet.ledger.repository.LedgerEntryRepository;
 import com.openwallet.ledger.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -192,6 +199,92 @@ public class TransactionService {
         Transaction tx = transactionRepository.findById(id)
                 .orElseThrow(() -> new TransactionNotFoundException("Transaction not found"));
         return toResponse(tx);
+    }
+
+    @Transactional(readOnly = true)
+    public TransactionListResponse getTransactions(
+            Long walletId,
+            LocalDateTime fromDate,
+            LocalDateTime toDate,
+            TransactionStatus status,
+            TransactionType transactionType,
+            Integer page,
+            Integer size,
+            String sortBy,
+            String sortDirection
+    ) {
+        // Default pagination values
+        int pageNumber = (page != null && page >= 0) ? page : 0;
+        // Default to 20 if null or <= 0, cap at 100 if > 100
+        int pageSize = (size == null || size <= 0) ? 20 : Math.min(size, 100);
+
+        // Default sorting: by initiatedAt descending (newest first)
+        Sort sort = Sort.by(Sort.Direction.DESC, "initiatedAt");
+        if (sortBy != null && !sortBy.trim().isEmpty()) {
+            Sort.Direction direction = "asc".equalsIgnoreCase(sortDirection) 
+                    ? Sort.Direction.ASC 
+                    : Sort.Direction.DESC;
+            
+            // Validate sort field
+            String validSortBy = validateSortField(sortBy);
+            sort = Sort.by(direction, validSortBy);
+        }
+
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
+
+        // Query transactions with filters
+        Page<Transaction> transactionPage = transactionRepository.findTransactionsWithFilters(
+                walletId,
+                fromDate,
+                toDate,
+                status,
+                transactionType,
+                pageable
+        );
+
+        // Convert to response
+        List<TransactionResponse> transactionResponses = transactionPage.getContent().stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        // Build pagination metadata
+        TransactionListResponse.PaginationMetadata pagination = TransactionListResponse.PaginationMetadata.builder()
+                .page(transactionPage.getNumber())
+                .size(transactionPage.getSize())
+                .totalElements(transactionPage.getTotalElements())
+                .totalPages(transactionPage.getTotalPages())
+                .hasNext(transactionPage.hasNext())
+                .hasPrevious(transactionPage.hasPrevious())
+                .build();
+
+        return TransactionListResponse.builder()
+                .transactions(transactionResponses)
+                .pagination(pagination)
+                .build();
+    }
+
+    /**
+     * Validates and normalizes sort field name.
+     * Only allows sorting by safe fields to prevent SQL injection.
+     */
+    private String validateSortField(String sortBy) {
+        String normalized = sortBy.trim().toLowerCase();
+        // Allowed sort fields
+        switch (normalized) {
+            case "id":
+            case "initiatedat":
+            case "completedat":
+            case "amount":
+            case "status":
+            case "transactiontype":
+                return normalized.equals("initiatedat") ? "initiatedAt" :
+                       normalized.equals("completedat") ? "completedAt" :
+                       normalized.equals("transactiontype") ? "transactionType" :
+                       normalized;
+            default:
+                log.warn("Invalid sort field '{}', defaulting to 'initiatedAt'", sortBy);
+                return "initiatedAt";
+        }
     }
 
     private void createDoubleEntry(Transaction tx, Long fromWalletId, Long toWalletId, BigDecimal amount) {

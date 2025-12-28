@@ -17,6 +17,47 @@ Each task includes:
 - **Testing Requirements**: What tests are needed
 - **Estimated Complexity**: Low, Medium, High
 
+## ⚠️ Architectural Principles - Service Decoupling
+
+**IMPORTANT**: When implementing cross-service features, follow these principles to avoid service coupling:
+
+### ❌ **DO NOT**: Create HTTP Client Dependencies Between Services
+- **Never** create HTTP clients (e.g., `LedgerServiceClient`, `WalletServiceClient`) to call other services
+- **Never** make one service depend on another service's HTTP API
+- This creates tight coupling, network dependencies, and violates service boundaries
+
+### ✅ **DO**: Use Direct Database Access for Read-Only Operations
+- **When services share the same database**, use direct database access for read-only operations
+- Create read-only entities (marked with `@Immutable`) in the consuming service
+- Mark all columns as `insertable = false, updatable = false`
+- Use String types instead of enums to avoid class conflicts
+- Follow the existing pattern used in `BalanceReconciliationService` and `TransactionRepository` in wallet service
+
+### ✅ **DO**: Use Event-Driven Communication for Write Operations
+- For write operations or when services don't share a database, use Kafka events
+- Services publish events when state changes
+- Other services consume events and update their own state
+- This maintains loose coupling and eventual consistency
+
+### Example Pattern (Implemented in TASK-001/TASK-002):
+```
+✅ CORRECT: Wallet Service reads transactions directly from database
+   - Read-only Transaction entity (@Immutable)
+   - TransactionRepository with read-only queries
+   - No HTTP client dependency
+
+❌ WRONG: Wallet Service calls Ledger Service HTTP API
+   - LedgerServiceClient with HTTP calls
+   - Creates service coupling and network dependency
+```
+
+### When to Use Each Approach:
+- **Direct Database Access**: Read-only operations, services share database, performance-critical queries
+- **Event-Driven**: Write operations, services have separate databases, eventual consistency acceptable
+- **HTTP API**: Only for external services or when database sharing is not possible
+
+**Reference Implementation**: See `wallet-service` → `TransactionRepository` and `Transaction` entity (read-only) for the correct pattern.
+
 ## Task Groups
 
 ### Group 1: Transaction History and Querying (High Priority)
@@ -57,13 +98,15 @@ Each task includes:
 - **Dependencies**: TASK-001
 - **Description**:
   - Add endpoint: `GET /api/v1/wallets/{id}/transactions`
-  - Delegates to Ledger Service transaction query endpoint
+  - **Uses direct database access** (read-only Transaction entity and repository)
+  - **DO NOT** create HTTP client to call Ledger Service (see Architectural Principles above)
   - Validates wallet belongs to authenticated user
-  - Returns transactions for the wallet
+  - Returns transactions for the wallet with same filtering as TASK-001
 - **Acceptance Criteria**:
   - ✅ Endpoint returns transactions for wallet
   - ✅ Endpoint validates wallet ownership
   - ✅ Endpoint supports same filtering as TASK-001
+  - ✅ Uses read-only database access (no HTTP client dependency)
   - ✅ Unit tests cover wallet validation
   - ✅ Integration tests verify wallet transaction history
 - **Testing Requirements**:
@@ -71,6 +114,11 @@ Each task includes:
   - Integration tests for wallet transaction history
   - Integration tests for unauthorized access
 - **Estimated Complexity**: Low
+- **Implementation Notes**:
+  - Create read-only `Transaction` entity in wallet service (marked `@Immutable`)
+  - Create `TransactionRepository` with read-only queries
+  - Follow the same pattern as `LedgerEntryRepository` in wallet service
+  - All columns must be `insertable = false, updatable = false`
 
 ---
 

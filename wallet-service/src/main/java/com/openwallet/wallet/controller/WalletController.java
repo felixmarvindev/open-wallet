@@ -2,6 +2,7 @@ package com.openwallet.wallet.controller;
 
 import com.openwallet.wallet.config.JwtUtils;
 import com.openwallet.wallet.dto.CreateWalletRequest;
+import com.openwallet.wallet.dto.TransactionListResponse;
 import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.service.BalanceReconciliationService;
 import com.openwallet.wallet.service.CustomerIdResolver;
@@ -12,14 +13,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -82,6 +86,36 @@ public class WalletController {
         BalanceReconciliationService.ReconciliationResult result = 
                 balanceReconciliationService.reconcileBalance(walletId, customerId);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}/transactions")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<TransactionListResponse> getWalletTransactions(
+            @PathVariable("id") Long walletId,
+            @RequestHeader(value = "X-Customer-Id", required = false) Long headerCustomerId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String transactionType,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+    ) {
+        Long customerId = resolveCustomerId(headerCustomerId);
+        TransactionListResponse response = walletService.getWalletTransactions(
+                walletId,
+                customerId,
+                fromDate,
+                toDate,
+                status,
+                transactionType,
+                page,
+                size,
+                sortBy,
+                sortDirection
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**

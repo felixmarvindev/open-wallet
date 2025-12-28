@@ -3,10 +3,12 @@ package com.openwallet.ledger.service;
 import com.openwallet.ledger.domain.LedgerEntry;
 import com.openwallet.ledger.domain.Transaction;
 import com.openwallet.ledger.domain.TransactionStatus;
+import com.openwallet.ledger.domain.TransactionType;
 import com.openwallet.ledger.dto.DepositRequest;
 import com.openwallet.ledger.dto.TransferRequest;
-import com.openwallet.ledger.dto.WithdrawalRequest;
+import com.openwallet.ledger.dto.TransactionListResponse;
 import com.openwallet.ledger.dto.TransactionResponse;
+import com.openwallet.ledger.dto.WithdrawalRequest;
 import com.openwallet.ledger.exception.TransactionNotFoundException;
 import com.openwallet.ledger.events.TransactionEventProducer;
 import com.openwallet.ledger.repository.LedgerEntryRepository;
@@ -22,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -356,5 +359,387 @@ class TransactionServiceTest {
         assertThatThrownBy(() -> transactionService.createDeposit(request))
                 .isInstanceOf(com.openwallet.ledger.exception.WalletNotFoundException.class)
                 .hasMessageContaining("Wallet not found");
+    }
+
+    // ========== Transaction History Query Tests ==========
+
+    @Test
+    void getTransactionsShouldReturnAllTransactionsWhenNoFilters() {
+        // Setup: Create test wallets and transactions
+        createTestWallet(200L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(201L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(200L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("hist-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        WithdrawalRequest wd1 = WithdrawalRequest.builder()
+                .fromWalletId(200L)
+                .amount(new BigDecimal("50.00"))
+                .currency("KES")
+                .idempotencyKey("hist-wd-1")
+                .build();
+        transactionService.createWithdrawal(wd1);
+
+        TransferRequest tr1 = TransferRequest.builder()
+                .fromWalletId(200L)
+                .toWalletId(201L)
+                .amount(new BigDecimal("25.00"))
+                .currency("KES")
+                .idempotencyKey("hist-tr-1")
+                .build();
+        transactionService.createTransfer(tr1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query all transactions
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, null, null, 0, 20, null, null
+        );
+
+        // Then: Should return all transactions
+        assertThat(response.getTransactions()).isNotEmpty();
+        assertThat(response.getPagination().getTotalElements()).isGreaterThanOrEqualTo(3);
+        assertThat(response.getPagination().getPage()).isEqualTo(0);
+        assertThat(response.getPagination().getSize()).isEqualTo(20);
+    }
+
+    @Test
+    void getTransactionsShouldFilterByWalletId() {
+        // Setup: Create test wallets and transactions
+        createTestWallet(300L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(301L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(300L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("wallet-filter-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        DepositRequest dep2 = DepositRequest.builder()
+                .toWalletId(301L)
+                .amount(new BigDecimal("200.00"))
+                .currency("KES")
+                .idempotencyKey("wallet-filter-dep-2")
+                .build();
+        transactionService.createDeposit(dep2);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query transactions for wallet 300
+        TransactionListResponse response = transactionService.getTransactions(
+                300L, null, null, null, null, 0, 20, null, null
+        );
+
+        // Then: Should return only transactions involving wallet 300
+        assertThat(response.getTransactions()).isNotEmpty();
+        assertThat(response.getTransactions()).allMatch(tx -> 
+                tx.getToWalletId() != null && tx.getToWalletId().equals(300L) ||
+                tx.getFromWalletId() != null && tx.getFromWalletId().equals(300L)
+        );
+    }
+
+    @Test
+    void getTransactionsShouldFilterByDateRange() {
+        // Setup: Create test wallet
+        createTestWallet(400L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime yesterday = now.minusDays(1);
+        LocalDateTime tomorrow = now.plusDays(1);
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(400L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("date-filter-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query transactions within date range
+        TransactionListResponse response = transactionService.getTransactions(
+                null, yesterday, tomorrow, null, null, 0, 20, null, null
+        );
+
+        // Then: Should return transactions in the date range
+        assertThat(response.getTransactions()).isNotEmpty();
+    }
+
+    @Test
+    void getTransactionsShouldFilterByStatus() {
+        // Setup: Create test wallet
+        createTestWallet(500L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(500L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("status-filter-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query only COMPLETED transactions
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, TransactionStatus.COMPLETED, null, 0, 20, null, null
+        );
+
+        // Then: Should return only COMPLETED transactions
+        assertThat(response.getTransactions()).isNotEmpty();
+        assertThat(response.getTransactions()).allMatch(tx -> 
+                "COMPLETED".equals(tx.getStatus())
+        );
+    }
+
+    @Test
+    void getTransactionsShouldFilterByTransactionType() {
+        // Setup: Create test wallets
+        createTestWallet(600L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(601L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(600L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("type-filter-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        WithdrawalRequest wd1 = WithdrawalRequest.builder()
+                .fromWalletId(600L)
+                .amount(new BigDecimal("50.00"))
+                .currency("KES")
+                .idempotencyKey("type-filter-wd-1")
+                .build();
+        transactionService.createWithdrawal(wd1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query only DEPOSIT transactions
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, null, TransactionType.DEPOSIT, 0, 20, null, null
+        );
+
+        // Then: Should return only DEPOSIT transactions
+        assertThat(response.getTransactions()).isNotEmpty();
+        assertThat(response.getTransactions()).allMatch(tx -> 
+                "DEPOSIT".equals(tx.getTransactionType())
+        );
+    }
+
+    @Test
+    void getTransactionsShouldSupportPagination() {
+        // Setup: Create test wallet and multiple transactions
+        createTestWallet(700L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        for (int i = 1; i <= 5; i++) {
+            DepositRequest request = DepositRequest.builder()
+                    .toWalletId(700L)
+                    .amount(new BigDecimal("10.00"))
+                    .currency("KES")
+                    .idempotencyKey("pagination-dep-" + i)
+                    .build();
+            transactionService.createDeposit(request);
+        }
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query first page with size 2
+        TransactionListResponse page1 = transactionService.getTransactions(
+                700L, null, null, null, null, 0, 2, null, null
+        );
+
+        // Then: Should return 2 transactions
+        assertThat(page1.getTransactions()).hasSize(2);
+        assertThat(page1.getPagination().getPage()).isEqualTo(0);
+        assertThat(page1.getPagination().getSize()).isEqualTo(2);
+        assertThat(page1.getPagination().getTotalElements()).isGreaterThanOrEqualTo(5);
+        assertThat(page1.getPagination().isHasNext()).isTrue();
+
+        // When: Query second page
+        TransactionListResponse page2 = transactionService.getTransactions(
+                700L, null, null, null, null, 1, 2, null, null
+        );
+
+        // Then: Should return next 2 transactions
+        assertThat(page2.getTransactions()).hasSize(2);
+        assertThat(page2.getPagination().getPage()).isEqualTo(1);
+        assertThat(page2.getPagination().isHasPrevious()).isTrue();
+    }
+
+    @Test
+    void getTransactionsShouldSupportSorting() {
+        // Setup: Create test wallet and transactions
+        createTestWallet(800L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(800L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("sort-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        // Small delay to ensure different timestamps
+        try {
+            Thread.sleep(10);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        DepositRequest dep2 = DepositRequest.builder()
+                .toWalletId(800L)
+                .amount(new BigDecimal("200.00"))
+                .currency("KES")
+                .idempotencyKey("sort-dep-2")
+                .build();
+        transactionService.createDeposit(dep2);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query sorted by amount ascending
+        TransactionListResponse response = transactionService.getTransactions(
+                800L, null, null, null, null, 0, 20, "amount", "asc"
+        );
+
+        // Then: Transactions should be sorted by amount ascending
+        assertThat(response.getTransactions()).hasSizeGreaterThanOrEqualTo(2);
+        List<TransactionResponse> transactions = response.getTransactions();
+        for (int i = 0; i < transactions.size() - 1; i++) {
+            assertThat(transactions.get(i).getAmount())
+                    .isLessThanOrEqualTo(transactions.get(i + 1).getAmount());
+        }
+    }
+
+    @Test
+    void getTransactionsShouldUseDefaultPaginationWhenNotProvided() {
+        // Setup: Create test wallet
+        createTestWallet(900L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(900L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("default-pagination-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query with null pagination parameters
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, null, null, null, null, null, null
+        );
+
+        // Then: Should use defaults (page 0, size 20)
+        assertThat(response.getPagination().getPage()).isEqualTo(0);
+        assertThat(response.getPagination().getSize()).isEqualTo(20);
+    }
+
+    @Test
+    void getTransactionsShouldEnforceMaxPageSize() {
+        // Setup: Create test wallet
+        createTestWallet(1000L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(1000L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("max-size-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query with size > 100
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, null, null, 0, 200, null, null
+        );
+
+        // Then: Should cap at 100
+        assertThat(response.getPagination().getSize()).isEqualTo(100);
+    }
+
+    @Test
+    void getTransactionsShouldHandleInvalidSortField() {
+        // Setup: Create test wallet
+        createTestWallet(1100L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(1100L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("invalid-sort-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query with invalid sort field
+        TransactionListResponse response = transactionService.getTransactions(
+                null, null, null, null, null, 0, 20, "invalidField", "asc"
+        );
+
+        // Then: Should default to initiatedAt sorting (no exception thrown)
+        assertThat(response.getTransactions()).isNotEmpty();
+    }
+
+    @Test
+    void getTransactionsShouldSupportCombinedFilters() {
+        // Setup: Create test wallets
+        createTestWallet(1200L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+        createTestWallet(1201L, new BigDecimal("100000.00"), new BigDecimal("1000000.00"));
+
+        DepositRequest dep1 = DepositRequest.builder()
+                .toWalletId(1200L)
+                .amount(new BigDecimal("100.00"))
+                .currency("KES")
+                .idempotencyKey("combined-filter-dep-1")
+                .build();
+        transactionService.createDeposit(dep1);
+
+        WithdrawalRequest wd1 = WithdrawalRequest.builder()
+                .fromWalletId(1200L)
+                .amount(new BigDecimal("50.00"))
+                .currency("KES")
+                .idempotencyKey("combined-filter-wd-1")
+                .build();
+        transactionService.createWithdrawal(wd1);
+
+        testEntityManager.flush();
+        testEntityManager.clear();
+
+        // When: Query with combined filters (walletId + status + transactionType)
+        TransactionListResponse response = transactionService.getTransactions(
+                1200L, null, null, TransactionStatus.COMPLETED, TransactionType.DEPOSIT, 0, 20, null, null
+        );
+
+        // Then: Should return only matching transactions
+        assertThat(response.getTransactions()).isNotEmpty();
+        assertThat(response.getTransactions()).allMatch(tx -> 
+                "DEPOSIT".equals(tx.getTransactionType()) &&
+                "COMPLETED".equals(tx.getStatus()) &&
+                (tx.getToWalletId() != null && tx.getToWalletId().equals(1200L) ||
+                 tx.getFromWalletId() != null && tx.getFromWalletId().equals(1200L))
+        );
     }
 }
