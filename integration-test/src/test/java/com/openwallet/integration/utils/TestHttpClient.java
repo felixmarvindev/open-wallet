@@ -68,8 +68,36 @@ public class TestHttpClient {
      * Makes a GET request with optional authorization token.
      */
     public HttpResponse get(String path, String authToken) throws IOException {
+        return get(path, null, authToken);
+    }
+
+    /**
+     * Makes a GET request with query parameters and optional authorization token.
+     */
+    public HttpResponse get(String path, Map<String, String> queryParams, String authToken) throws IOException {
+        String url = baseUrl + path;
+        
+        // Build query string if parameters provided
+        if (queryParams != null && !queryParams.isEmpty()) {
+            StringBuilder queryString = new StringBuilder();
+            boolean first = true;
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                if (entry.getValue() != null) {
+                    if (!first) {
+                        queryString.append("&");
+                    }
+                    queryString.append(entry.getKey()).append("=")
+                               .append(java.net.URLEncoder.encode(entry.getValue(), java.nio.charset.StandardCharsets.UTF_8));
+                    first = false;
+                }
+            }
+            if (queryString.length() > 0) {
+                url += "?" + queryString.toString();
+            }
+        }
+        
         Request.Builder requestBuilder = new Request.Builder()
-                .url(baseUrl + path)
+                .url(url)
                 .get();
         
         if (authToken != null) {
@@ -77,7 +105,7 @@ public class TestHttpClient {
         }
         
         Request request = requestBuilder.build();
-        log.debug("GET {}", path);
+        log.debug("GET {}", url);
         
         try (Response response = httpClient.newCall(request).execute()) {
             String responseBody = response.body() != null ? response.body().string() : null;

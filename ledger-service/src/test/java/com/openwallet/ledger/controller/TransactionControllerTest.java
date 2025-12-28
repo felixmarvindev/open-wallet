@@ -18,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -122,6 +123,131 @@ class TransactionControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/transactions returns 200 with paginated results")
+    void getTransactionsShouldReturnOk() throws Exception {
+        com.openwallet.ledger.dto.TransactionListResponse response = com.openwallet.ledger.dto.TransactionListResponse.builder()
+                .transactions(List.of(
+                        sampleResponse(1L, "DEPOSIT"),
+                        sampleResponse(2L, "WITHDRAWAL")
+                ))
+                .pagination(com.openwallet.ledger.dto.TransactionListResponse.PaginationMetadata.builder()
+                        .page(0)
+                        .size(20)
+                        .totalElements(2)
+                        .totalPages(1)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build())
+                .build();
+
+        Mockito.when(transactionService.getTransactions(
+                eq(null), eq(null), eq(null), eq(null), eq(null),
+                eq(0), eq(20), eq(null), eq("desc")
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/transactions")
+                .param("page", "0")
+                .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/transactions with filters returns filtered results")
+    void getTransactionsWithFiltersShouldReturnFilteredResults() throws Exception {
+        com.openwallet.ledger.dto.TransactionListResponse response = com.openwallet.ledger.dto.TransactionListResponse.builder()
+                .transactions(List.of(sampleResponse(1L, "DEPOSIT")))
+                .pagination(com.openwallet.ledger.dto.TransactionListResponse.PaginationMetadata.builder()
+                        .page(0)
+                        .size(20)
+                        .totalElements(1)
+                        .totalPages(1)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build())
+                .build();
+
+        Mockito.when(transactionService.getTransactions(
+                eq(1L), eq(null), eq(null), eq(com.openwallet.ledger.domain.TransactionStatus.COMPLETED),
+                eq(com.openwallet.ledger.domain.TransactionType.DEPOSIT),
+                eq(0), eq(20), eq(null), eq("desc")
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/transactions")
+                .param("walletId", "1")
+                .param("status", "COMPLETED")
+                .param("transactionType", "DEPOSIT")
+                .param("page", "0")
+                .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/transactions with date range returns filtered results")
+    void getTransactionsWithDateRangeShouldReturnFilteredResults() throws Exception {
+        com.openwallet.ledger.dto.TransactionListResponse response = com.openwallet.ledger.dto.TransactionListResponse.builder()
+                .transactions(List.of(sampleResponse(1L, "DEPOSIT")))
+                .pagination(com.openwallet.ledger.dto.TransactionListResponse.PaginationMetadata.builder()
+                        .page(0)
+                        .size(20)
+                        .totalElements(1)
+                        .totalPages(1)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build())
+                .build();
+
+        java.time.LocalDateTime fromDate = java.time.LocalDateTime.of(2024, 1, 1, 0, 0);
+        java.time.LocalDateTime toDate = java.time.LocalDateTime.of(2024, 12, 31, 23, 59);
+
+        Mockito.when(transactionService.getTransactions(
+                eq(null), eq(fromDate), eq(toDate), eq(null), eq(null),
+                eq(0), eq(20), eq(null), eq("desc")
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/transactions")
+                .param("fromDate", "2024-01-01T00:00:00")
+                .param("toDate", "2024-12-31T23:59:00")
+                .param("page", "0")
+                .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/transactions with sorting returns sorted results")
+    void getTransactionsWithSortingShouldReturnSortedResults() throws Exception {
+        com.openwallet.ledger.dto.TransactionListResponse response = com.openwallet.ledger.dto.TransactionListResponse.builder()
+                .transactions(List.of(
+                        sampleResponse(1L, "DEPOSIT"),
+                        sampleResponse(2L, "WITHDRAWAL")
+                ))
+                .pagination(com.openwallet.ledger.dto.TransactionListResponse.PaginationMetadata.builder()
+                        .page(0)
+                        .size(20)
+                        .totalElements(2)
+                        .totalPages(1)
+                        .hasNext(false)
+                        .hasPrevious(false)
+                        .build())
+                .build();
+
+        Mockito.when(transactionService.getTransactions(
+                eq(null), eq(null), eq(null), eq(null), eq(null),
+                eq(0), eq(20), eq("amount"), eq("asc")
+        )).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/transactions")
+                .param("sortBy", "amount")
+                .param("sortDirection", "asc")
+                .param("page", "0")
+                .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(objectMapper.writeValueAsString(response)));
     }
 
     private TransactionResponse sampleResponse(Long id, String type) {

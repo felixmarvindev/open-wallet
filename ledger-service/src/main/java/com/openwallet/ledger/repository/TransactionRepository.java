@@ -54,6 +54,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      * Finds transactions with optional filtering by wallet, date range, status, and transaction type.
      * Supports pagination and sorting via Pageable.
      * 
+     * Uses a workaround for PostgreSQL's type inference issue with nullable date parameters.
+     * When a date parameter is NULL, we use COALESCE to provide a type hint.
+     * 
      * @param walletId Optional wallet ID filter (matches fromWalletId or toWalletId)
      * @param fromDate Optional start date (inclusive)
      * @param toDate Optional end date (inclusive)
@@ -64,8 +67,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
      */
     @Query("SELECT t FROM Transaction t WHERE " +
            "(:walletId IS NULL OR t.fromWalletId = :walletId OR t.toWalletId = :walletId) AND " +
-           "(:fromDate IS NULL OR t.initiatedAt >= :fromDate) AND " +
-           "(:toDate IS NULL OR t.initiatedAt <= :toDate) AND " +
+           "t.initiatedAt >= :fromDate AND " +
+           "t.initiatedAt <= :toDate AND " +
            "(:status IS NULL OR t.status = :status) AND " +
            "(:transactionType IS NULL OR t.transactionType = :transactionType)")
     Page<Transaction> findTransactionsWithFilters(

@@ -62,15 +62,15 @@ public class TransactionController {
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'AUDITOR')")
     public ResponseEntity<TransactionListResponse> getTransactions(
-            @RequestParam(required = false) Long walletId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
-            @RequestParam(required = false) TransactionStatus status,
-            @RequestParam(required = false) TransactionType transactionType,
-            @RequestParam(required = false, defaultValue = "0") Integer page,
-            @RequestParam(required = false, defaultValue = "20") Integer size,
-            @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false, defaultValue = "desc") String sortDirection
+            @RequestParam(name = "walletId", required = false) Long walletId,
+            @RequestParam(name = "fromDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(name = "toDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime toDate,
+            @RequestParam(name = "status", required = false) TransactionStatus status,
+            @RequestParam(name = "transactionType", required = false) TransactionType transactionType,
+            @RequestParam(name = "page", required = false, defaultValue = "0") Integer page,
+            @RequestParam(name = "size", required = false, defaultValue = "20") Integer size,
+            @RequestParam(name = "sortBy", required = false) String sortBy,
+            @RequestParam(name = "sortDirection", required = false, defaultValue = "desc") String sortDirection
     ) {
         TransactionListResponse response = transactionService.getTransactions(
                 walletId,

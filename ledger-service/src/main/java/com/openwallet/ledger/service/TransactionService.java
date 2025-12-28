@@ -232,11 +232,16 @@ public class TransactionService {
 
         Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
 
+        // Provide default dates to avoid PostgreSQL type inference issues with null parameters
+        // Use reasonable date bounds that PostgreSQL can handle (not MIN/MAX which are out of range)
+        LocalDateTime effectiveFromDate = fromDate != null ? fromDate : LocalDateTime.of(1900, 1, 1, 0, 0);
+        LocalDateTime effectiveToDate = toDate != null ? toDate : LocalDateTime.of(2100, 12, 31, 23, 59, 59);
+
         // Query transactions with filters
         Page<Transaction> transactionPage = transactionRepository.findTransactionsWithFilters(
                 walletId,
-                fromDate,
-                toDate,
+                effectiveFromDate,
+                effectiveToDate,
                 status,
                 transactionType,
                 pageable
