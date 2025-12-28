@@ -34,6 +34,7 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
     private final TransactionEventProducer transactionEventProducer;
+    private final LedgerEntryService ledgerEntryService;
 
     @Transactional
     public TransactionResponse createDeposit(DepositRequest request) {
@@ -167,15 +168,34 @@ public class TransactionService {
     }
 
     private void createDoubleEntry(Transaction tx, Long fromWalletId, Long toWalletId, BigDecimal amount) {
-        // Note: balanceAfter is set to the transaction amount as a placeholder.
-        // Real balance computation requires integration with wallet service to get current balances.
-        // This is a known limitation and will be addressed in future work.
-        BigDecimal debitBalance = amount;
-        BigDecimal creditBalance = amount;
         log.info("Creating double-entry for transaction txId={}, fromWalletId={}, toWalletId={}, amount={}",
-                tx.getId(), fromWalletId, toWalletId, amount);  
+                tx.getId(), fromWalletId, toWalletId, amount);
 
         try {
+            // Calculate current balances from previous ledger entries BEFORE creating new entries
+            // This ensures balanceAfter reflects the actual wallet balance after this transaction
+            BigDecimal fromWalletBalanceBefore = BigDecimal.ZERO;
+            BigDecimal toWalletBalanceBefore = BigDecimal.ZERO;
+
+            if (fromWalletId != null) {
+                fromWalletBalanceBefore = ledgerEntryService.calculateBalanceFromLedger(fromWalletId);
+                log.debug("Current balance for fromWalletId={} (before transaction): {}", fromWalletId, fromWalletBalanceBefore);
+            }
+
+            if (toWalletId != null) {
+                toWalletBalanceBefore = ledgerEntryService.calculateBalanceFromLedger(toWalletId);
+                log.debug("Current balance for toWalletId={} (before transaction): {}", toWalletId, toWalletBalanceBefore);
+            }
+
+            // Calculate balanceAfter: DEBIT decreases balance, CREDIT increases balance
+            BigDecimal debitBalanceAfter = fromWalletId != null 
+                    ? fromWalletBalanceBefore.subtract(amount)  // DEBIT: decrease balance
+                    : amount;  // Cash account: just use amount as placeholder
+            BigDecimal creditBalanceAfter = toWalletId != null 
+                    ? toWalletBalanceBefore.add(amount)  // CREDIT: increase balance
+                    : amount;  // Cash account: just use amount as placeholder
+
+            // Create and save DEBIT entry
             LedgerEntry debit;
             if (fromWalletId != null) {
                 debit = LedgerEntry.builder()
@@ -184,24 +204,28 @@ public class TransactionService {
                         .accountType("WALLET_" + fromWalletId)
                         .entryType(EntryType.DEBIT)
                         .amount(amount)
-                        .balanceAfter(debitBalance)
+                        .balanceAfter(debitBalanceAfter)
                         .build();
-                log.debug("Prepared DEBIT LedgerEntry for walletId={}, txId={}, amount={}, balanceAfter={}", fromWalletId, tx.getId(), amount, debitBalance);
+                log.debug("Prepared DEBIT LedgerEntry for walletId={}, txId={}, amount={}, balanceBefore={}, balanceAfter={}", 
+                        fromWalletId, tx.getId(), amount, fromWalletBalanceBefore, debitBalanceAfter);
             } else {
                 debit = LedgerEntry.builder()
                         .transaction(tx)
                         .accountType("CASH_ACCOUNT")
                         .entryType(EntryType.DEBIT)
                         .amount(amount)
-                        .balanceAfter(debitBalance)
+                        .balanceAfter(debitBalanceAfter)
                         .build();
-                log.debug("Prepared DEBIT LedgerEntry for cash account, txId={}, amount={}, balanceAfter={}", tx.getId(), amount, debitBalance);
+                log.debug("Prepared DEBIT LedgerEntry for cash account, txId={}, amount={}, balanceAfter={}", 
+                        tx.getId(), amount, debitBalanceAfter);
             }
 
             LedgerEntry savedDebit = ledgerEntryRepository.save(debit);
-            log.info("Saved DEBIT LedgerEntry: id={}, walletId={}, accountType={}, amount={}", 
-                    savedDebit.getId(), savedDebit.getWalletId(), savedDebit.getAccountType(), savedDebit.getAmount());
+            log.info("Saved DEBIT LedgerEntry: id={}, walletId={}, accountType={}, amount={}, balanceAfter={}", 
+                    savedDebit.getId(), savedDebit.getWalletId(), savedDebit.getAccountType(), 
+                    savedDebit.getAmount(), savedDebit.getBalanceAfter());
 
+            // Create and save CREDIT entry
             LedgerEntry credit;
             if (toWalletId != null) {
                 credit = LedgerEntry.builder()
@@ -210,23 +234,26 @@ public class TransactionService {
                         .accountType("WALLET_" + toWalletId)
                         .entryType(EntryType.CREDIT)
                         .amount(amount)
-                        .balanceAfter(creditBalance)
+                        .balanceAfter(creditBalanceAfter)
                         .build();
-                log.debug("Prepared CREDIT LedgerEntry for walletId={}, txId={}, amount={}, balanceAfter={}", toWalletId, tx.getId(), amount, creditBalance);
+                log.debug("Prepared CREDIT LedgerEntry for walletId={}, txId={}, amount={}, balanceBefore={}, balanceAfter={}", 
+                        toWalletId, tx.getId(), amount, toWalletBalanceBefore, creditBalanceAfter);
             } else {
                 credit = LedgerEntry.builder()
                         .transaction(tx)
                         .accountType("CASH_ACCOUNT")
                         .entryType(EntryType.CREDIT)
                         .amount(amount)
-                        .balanceAfter(creditBalance)
+                        .balanceAfter(creditBalanceAfter)
                         .build();
-                log.debug("Prepared CREDIT LedgerEntry for cash account, txId={}, amount={}, balanceAfter={}", tx.getId(), amount, creditBalance);
+                log.debug("Prepared CREDIT LedgerEntry for cash account, txId={}, amount={}, balanceAfter={}", 
+                        tx.getId(), amount, creditBalanceAfter);
             }
 
             LedgerEntry savedCredit = ledgerEntryRepository.save(credit);
-            log.info("Saved CREDIT LedgerEntry: id={}, walletId={}, accountType={}, amount={}", 
-                    savedCredit.getId(), savedCredit.getWalletId(), savedCredit.getAccountType(), savedCredit.getAmount());
+            log.info("Saved CREDIT LedgerEntry: id={}, walletId={}, accountType={}, amount={}, balanceAfter={}", 
+                    savedCredit.getId(), savedCredit.getWalletId(), savedCredit.getAccountType(), 
+                    savedCredit.getAmount(), savedCredit.getBalanceAfter());
         } catch (Exception e) {
             log.error("Failed to create double-entry for transaction txId={}, fromWalletId={}, toWalletId={}, amount={}: {}",
                     tx.getId(), fromWalletId, toWalletId, amount, e.getMessage(), e);
@@ -270,9 +297,17 @@ public class TransactionService {
 
     private String normalizeCurrency(String currency) {
         if (!StringUtils.hasText(currency)) {
-            throw new IllegalArgumentException("Currency is required");
+            // Default to KES for MVP
+            return "KES";
         }
-        return currency.toUpperCase(Locale.ROOT);
+        String normalized = currency.toUpperCase(Locale.ROOT);
+        
+        // For MVP: Only KES is supported
+        if (!"KES".equals(normalized)) {
+            throw new IllegalArgumentException("Only KES currency is supported in MVP. Provided: " + currency);
+        }
+        
+        return normalized;
     }
 
     private TransactionResponse toResponse(Transaction tx) {

@@ -7,7 +7,6 @@ import com.openwallet.wallet.dto.BalanceResponse;
 import com.openwallet.wallet.dto.CreateWalletRequest;
 import com.openwallet.wallet.dto.WalletResponse;
 import com.openwallet.wallet.exception.InsufficientBalanceException;
-import com.openwallet.wallet.exception.WalletAlreadyExistsException;
 import com.openwallet.wallet.exception.WalletNotFoundException;
 import com.openwallet.wallet.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,15 +35,23 @@ public class WalletService {
         if (customerId == null) {
             throw new IllegalArgumentException("Customer ID is required");
         }
-        if (request == null || !StringUtils.hasText(request.getCurrency())) {
-            throw new IllegalArgumentException("Currency is required");
+        if (request == null) {
+            throw new IllegalArgumentException("Request is required");
         }
 
-        String currency = request.getCurrency().toUpperCase(Locale.ROOT);
-        walletRepository.findByCustomerIdAndCurrency(customerId, currency).ifPresent(existing -> {
-            throw new WalletAlreadyExistsException("Wallet already exists for currency: " + currency);
-        });
+        // For MVP: Only KES is supported
+        // Default to KES if not provided, or validate it's KES if provided
+        String currency = "KES";
+        if (StringUtils.hasText(request.getCurrency())) {
+            currency = request.getCurrency().toUpperCase(Locale.ROOT);
+            if (!"KES".equals(currency)) {
+                throw new IllegalArgumentException("Only KES currency is supported in MVP. Provided: " + currency);
+            }
+        }
 
+        // Customers can now have multiple wallets with the same currency (KES)
+        // No duplicate check needed - the unique constraint has been removed
+        
         Wallet wallet = Wallet.builder()
                 .customerId(customerId)
                 .currency(currency)

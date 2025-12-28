@@ -52,34 +52,66 @@ class WalletServiceTest {
     }
 
     @Test
-    void createWalletShouldFailWhenDuplicateCurrency() {
+    void createWalletShouldAllowMultipleKESWallets() {
+        // Create first KES wallet
         Optional.ofNullable(walletRepository.save(Wallet.builder().customerId(1L).currency("KES").build()))
                 .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
 
+        // Create second KES wallet - should succeed
         CreateWalletRequest request = CreateWalletRequest.builder()
                 .currency("KES")
                 .build();
 
+        WalletResponse response = walletService.createWallet(1L, request);
+        
+        assertThat(response.getId()).isNotNull();
+        assertThat(response.getCurrency()).isEqualTo("KES");
+        assertThat(response.getCustomerId()).isEqualTo(1L);
+        
+        // Verify both wallets exist
+        List<Wallet> wallets = walletRepository.findByCustomerId(1L);
+        assertThat(wallets).hasSize(2);
+        assertThat(wallets).extracting(Wallet::getCurrency).containsOnly("KES");
+    }
+
+    @Test
+    void createWalletShouldRejectNonKESCurrency() {
+        CreateWalletRequest request = CreateWalletRequest.builder()
+                .currency("USD")
+                .build();
+
         assertThatThrownBy(() -> walletService.createWallet(1L, request))
-                .isInstanceOf(WalletAlreadyExistsException.class);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only KES currency is supported");
+    }
+
+    @Test
+    void createWalletShouldDefaultToKESWhenCurrencyNotProvided() {
+        CreateWalletRequest request = CreateWalletRequest.builder()
+                .currency(null) // Not provided
+                .build();
+
+        WalletResponse response = walletService.createWallet(1L, request);
+
+        assertThat(response.getCurrency()).isEqualTo("KES");
     }
 
     @Test
     void getWalletShouldReturnOwnedWallet() {
         Wallet saved = Optional
-                .ofNullable(walletRepository.save(Wallet.builder().customerId(2L).currency("USD").build()))
+                .ofNullable(walletRepository.save(Wallet.builder().customerId(2L).currency("KES").build()))
                 .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
 
         WalletResponse response = walletService.getWallet(saved.getId(), 2L);
 
         assertThat(response.getId()).isEqualTo(saved.getId());
-        assertThat(response.getCurrency()).isEqualTo("USD");
+        assertThat(response.getCurrency()).isEqualTo("KES");
     }
 
     @Test
     void getWalletShouldFailWhenNotOwned() {
         Wallet saved = Optional
-                .ofNullable(walletRepository.save(Wallet.builder().customerId(2L).currency("USD").build()))
+                .ofNullable(walletRepository.save(Wallet.builder().customerId(2L).currency("KES").build()))
                 .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
 
         assertThatThrownBy(() -> walletService.getWallet(saved.getId(), 3L))
@@ -88,17 +120,17 @@ class WalletServiceTest {
 
     @Test
     void getMyWalletsShouldReturnOnlyCustomersWallets() {
+        // For MVP, only KES is supported. The unique constraint (customer_id, currency)
+        // means a customer can only have one KES wallet.
         Optional.ofNullable(walletRepository.save(Wallet.builder().customerId(5L).currency("KES").build()))
                 .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
-        Optional.ofNullable(walletRepository.save(Wallet.builder().customerId(5L).currency("USD").build()))
-                .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
-        Optional.ofNullable(walletRepository.save(Wallet.builder().customerId(6L).currency("EUR").build()))
+        Optional.ofNullable(walletRepository.save(Wallet.builder().customerId(6L).currency("KES").build()))
                 .orElseThrow(() -> new IllegalStateException("Failed to seed wallet"));
 
         List<WalletResponse> wallets = walletService.getMyWallets(5L);
 
-        assertThat(wallets).hasSize(2);
+        assertThat(wallets).hasSize(1);
         assertThat(wallets).extracting(WalletResponse::getCurrency)
-                .containsExactlyInAnyOrder("KES", "USD");
+                .containsExactly("KES");
     }
 }

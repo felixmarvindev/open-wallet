@@ -91,7 +91,7 @@ class TransactionServiceIntegrationTest {
                 .fromWalletId(201L)
                 .toWalletId(202L)
                 .amount(new BigDecimal("75.00"))
-                .currency("USD")
+                .currency("KES")
                 .idempotencyKey("it-tr-1")
                 .build();
 
@@ -130,7 +130,7 @@ class TransactionServiceIntegrationTest {
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(300L)
                 .amount(new BigDecimal("10.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("it-dep-same")
                 .build();
 

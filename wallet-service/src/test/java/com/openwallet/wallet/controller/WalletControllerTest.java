@@ -78,7 +78,7 @@ class WalletControllerTest {
     @Test
     @DisplayName("GET /api/v1/wallets/{id} returns 200 when owned")
     void getWalletShouldReturnOk() throws Exception {
-        WalletResponse response = sampleResponse(5L, "USD");
+        WalletResponse response = sampleResponse(5L, "KES");
         Mockito.when(walletService.getWallet(5L, 10L)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/wallets/5")
@@ -106,9 +106,9 @@ class WalletControllerTest {
     @Test
     @DisplayName("GET /api/v1/wallets/me returns list")
     void getMyWalletsShouldReturnList() throws Exception {
+        // For MVP, only KES is supported, so customers typically have one wallet
         List<WalletResponse> responses = Arrays.asList(
-                sampleResponse(1L, "KES"),
-                sampleResponse(2L, "USD"));
+                sampleResponse(1L, "KES"));
         Mockito.when(walletService.getMyWallets(10L)).thenReturn(responses);
 
         mockMvc.perform(get("/api/v1/wallets/me")

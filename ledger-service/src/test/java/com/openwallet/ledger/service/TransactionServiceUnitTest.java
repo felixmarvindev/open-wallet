@@ -199,7 +199,7 @@ class TransactionServiceUnitTest {
         WithdrawalRequest request = WithdrawalRequest.builder()
                 .fromWalletId(21L)
                 .amount(new BigDecimal("50.00"))
-                .currency("USD")
+                .currency("KES")
                 .idempotencyKey("wd-1")
                 .build();
 
@@ -207,7 +207,7 @@ class TransactionServiceUnitTest {
                 .id(2L)
                 .transactionType(TransactionType.WITHDRAWAL)
                 .amount(new BigDecimal("50.00"))
-                .currency("USD")
+                .currency("KES")
                 .fromWalletId(21L)
                 .status(TransactionStatus.PENDING)
                 .idempotencyKey("wd-1")
@@ -237,7 +237,7 @@ class TransactionServiceUnitTest {
         WithdrawalRequest request = WithdrawalRequest.builder()
                 .fromWalletId(null)
                 .amount(new BigDecimal("50.00"))
-                .currency("USD")
+                .currency("KES")
                 .idempotencyKey("wd-null")
                 .build();
 
@@ -260,7 +260,7 @@ class TransactionServiceUnitTest {
                 .fromWalletId(30L)
                 .toWalletId(31L)
                 .amount(new BigDecimal("25.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("tr-1")
                 .build();
 
@@ -268,7 +268,7 @@ class TransactionServiceUnitTest {
                 .id(3L)
                 .transactionType(TransactionType.TRANSFER)
                 .amount(new BigDecimal("25.00"))
-                .currency("EUR")
+                .currency("KES")
                 .fromWalletId(30L)
                 .toWalletId(31L)
                 .status(TransactionStatus.PENDING)
@@ -300,7 +300,7 @@ class TransactionServiceUnitTest {
                 .fromWalletId(null)
                 .toWalletId(31L)
                 .amount(new BigDecimal("25.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("tr-null-from")
                 .build();
 
@@ -321,7 +321,7 @@ class TransactionServiceUnitTest {
                 .fromWalletId(30L)
                 .toWalletId(null)
                 .amount(new BigDecimal("25.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("tr-null-to")
                 .build();
 
@@ -342,7 +342,7 @@ class TransactionServiceUnitTest {
                 .fromWalletId(30L)
                 .toWalletId(30L)
                 .amount(new BigDecimal("25.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("tr-same")
                 .build();
 
@@ -443,8 +443,8 @@ class TransactionServiceUnitTest {
     }
 
     @Test
-    @DisplayName("createDeposit should throw exception when currency is null")
-    void createDepositShouldThrowWhenCurrencyIsNull() {
+    @DisplayName("createDeposit should default to KES when currency is null")
+    void createDepositShouldDefaultToKESWhenCurrencyIsNull() {
         // Given
         DepositRequest request = DepositRequest.builder()
                 .toWalletId(20L)
@@ -453,13 +453,71 @@ class TransactionServiceUnitTest {
                 .idempotencyKey("dep-null-currency")
                 .build();
 
-        // When/Then - Validation happens before repository call, so no stubbing needed
+        when(transactionRepository.findByIdempotencyKey("dep-null-currency")).thenReturn(Optional.empty());
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction tx = invocation.getArgument(0);
+            tx.setId(1L);
+            return tx;
+        });
+        when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        TransactionResponse response = transactionService.createDeposit(request);
+
+        // Then
+        assertThat(response.getCurrency()).isEqualTo("KES");
+    }
+
+    @Test
+    @DisplayName("createDeposit should reject non-KES currency")
+    void createDepositShouldRejectNonKESCurrency() {
+        // Given
+        DepositRequest request = DepositRequest.builder()
+                .toWalletId(20L)
+                .amount(new BigDecimal("100.00"))
+                .currency("USD")
+                .idempotencyKey("dep-usd")
+                .build();
+
+        // When/Then
         assertThatThrownBy(() -> transactionService.createDeposit(request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Currency is required");
+                .hasMessageContaining("Only KES currency is supported");
+    }
 
-        verify(transactionRepository, never()).findByIdempotencyKey(anyString());
-        verify(transactionRepository, never()).save(any(Transaction.class));
+    @Test
+    @DisplayName("createWithdrawal should reject non-KES currency")
+    void createWithdrawalShouldRejectNonKESCurrency() {
+        // Given
+        WithdrawalRequest request = WithdrawalRequest.builder()
+                .fromWalletId(21L)
+                .amount(new BigDecimal("50.00"))
+                .currency("EUR")
+                .idempotencyKey("wd-eur")
+                .build();
+
+        // When/Then
+        assertThatThrownBy(() -> transactionService.createWithdrawal(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only KES currency is supported");
+    }
+
+    @Test
+    @DisplayName("createTransfer should reject non-KES currency")
+    void createTransferShouldRejectNonKESCurrency() {
+        // Given
+        TransferRequest request = TransferRequest.builder()
+                .fromWalletId(30L)
+                .toWalletId(31L)
+                .amount(new BigDecimal("25.00"))
+                .currency("GBP")
+                .idempotencyKey("tr-gbp")
+                .build();
+
+        // When/Then
+        assertThatThrownBy(() -> transactionService.createTransfer(request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Only KES currency is supported");
     }
 
     // ========== Get Transaction Tests ==========

@@ -18,7 +18,11 @@ import java.math.BigDecimal;
 @Builder
 public class CreateWalletRequest {
 
-    @NotNull(message = "Currency is required")
+    /**
+     * Currency for the wallet. For MVP, only KES is supported.
+     * If not provided, defaults to KES.
+     * If provided, must be KES.
+     */
     @CurrencyCode
     private String currency;
 

@@ -21,10 +21,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests wallet CRUD operations:
- * - Create multiple wallets (KES, USD, EUR)
+ * - Create wallet (KES only in MVP)
  * - Get wallet by ID
  * - Get balance
- * - Cannot create duplicate currency
+ * - Cannot create duplicate currency (unique constraint on customer_id, currency)
  * - Cannot access other user's wallet
  * 
  * Optimized: Only starts AUTH, CUSTOMER, and WALLET services.
@@ -112,8 +112,8 @@ public class WalletCrudTest extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("User can create multiple wallets with different currencies")
-    void userCanCreateMultipleWallets() throws Exception {
+    @DisplayName("User can create KES wallet (only currency supported in MVP)")
+    void userCanCreateKESWallet() throws Exception {
         // Use pre-created user
         TestDataValidator.requireUserExists(userManager, multiWalletUserUsername);
         String accessToken = userManager.getToken(multiWalletUserUsername);
@@ -126,41 +126,45 @@ public class WalletCrudTest extends IntegrationTestBase {
         TestHttpClient.HttpResponse initialWallets = walletClient.get("/api/v1/wallets/me", accessToken);
         List<Map<String, Object>> initial = walletClient.parseJsonArray(initialWallets.getBody());
         log.info("Initial wallets: {}", initial.size());
-
-        // Create USD wallet
+        assertThat(initial).hasSizeGreaterThanOrEqualTo(1);
+        
+        // Verify all wallets are KES
+        List<String> currencies = initial.stream()
+                .map(w -> (String) w.get("currency"))
+                .toList();
+        assertThat(currencies).containsOnly("KES");
+        log.info("✓ All wallets are KES: {}", currencies);
+        
+        // Try to create another KES wallet - should succeed (multiple KES wallets allowed)
+        Map<String, String> kesRequest = new HashMap<>();
+        kesRequest.put("currency", "KES");
+        TestHttpClient.HttpResponse kesResponse = walletClient.post("/api/v1/wallets", kesRequest, accessToken);
+        assertThat(kesResponse.getStatusCode()).isEqualTo(201);
+        Map<String, Object> secondWallet = walletClient.parseJson(kesResponse.getBody());
+        assertThat(secondWallet.get("currency")).isEqualTo("KES");
+        log.info("✓ Second KES wallet created successfully: {}", secondWallet.get("id"));
+        
+        // Verify we now have 2 KES wallets
+        TestHttpClient.HttpResponse allWallets = walletClient.get("/api/v1/wallets/me", accessToken);
+        List<Map<String, Object>> wallets = walletClient.parseJsonArray(allWallets.getBody());
+        assertThat(wallets).hasSize(2);
+        List<String> allCurrencies = wallets.stream()
+                .map(w -> (String) w.get("currency"))
+                .toList();
+        assertThat(allCurrencies).containsOnly("KES");
+        log.info("✓ Customer now has {} KES wallets", wallets.size());
+        
+        // Try to create non-KES wallet - should be rejected
         Map<String, String> usdRequest = new HashMap<>();
         usdRequest.put("currency", "USD");
         TestHttpClient.HttpResponse usdResponse = walletClient.post("/api/v1/wallets", usdRequest, accessToken);
-        assertThat(usdResponse.getStatusCode()).isEqualTo(201);
-        Map<String, Object> usdWallet = walletClient.parseJson(usdResponse.getBody());
-        assertThat(usdWallet.get("currency")).isEqualTo("USD");
-        log.info("✓ USD wallet created: {}", usdWallet.get("id"));
-
-        // Create EUR wallet
-        Map<String, String> eurRequest = new HashMap<>();
-        eurRequest.put("currency", "EUR");
-        TestHttpClient.HttpResponse eurResponse = walletClient.post("/api/v1/wallets", eurRequest, accessToken);
-        assertThat(eurResponse.getStatusCode()).isEqualTo(201);
-        Map<String, Object> eurWallet = walletClient.parseJson(eurResponse.getBody());
-        assertThat(eurWallet.get("currency")).isEqualTo("EUR");
-        log.info("✓ EUR wallet created: {}", eurWallet.get("id"));
-
-        // Get all wallets - should have 3 now (KES auto-created + USD + EUR)
-        TestHttpClient.HttpResponse allWallets = walletClient.get("/api/v1/wallets/me", accessToken);
-        List<Map<String, Object>> wallets = walletClient.parseJsonArray(allWallets.getBody());
-        assertThat(wallets).hasSizeGreaterThanOrEqualTo(3);
-
-        // Verify currencies
-        List<String> currencies = wallets.stream()
-                .map(w -> (String) w.get("currency"))
-                .toList();
-        assertThat(currencies).contains("KES", "USD", "EUR");
-        log.info("✓ All wallets verified: {}", currencies);
+        assertThat(usdResponse.getStatusCode()).isEqualTo(400);
+        log.info("✓ Non-KES wallet creation correctly rejected");
     }
 
     @Test
-    @DisplayName("Cannot create duplicate currency wallet")
-    void cannotCreateDuplicateCurrencyWallet() throws Exception {
+    @DisplayName("Can create multiple wallets with same currency (KES)")
+    void canCreateMultipleKESWallets() throws Exception {
         // Use pre-created user
         TestDataValidator.requireUserExists(userManager, duplicateUserUsername);
         String accessToken = userManager.getToken(duplicateUserUsername);
@@ -168,14 +172,29 @@ public class WalletCrudTest extends IntegrationTestBase {
 
         Thread.sleep(2000); // Wait for auto-created KES wallet
 
-        // Try to create another KES wallet
-        Map<String, String> kesRequest = new HashMap<>();
-        kesRequest.put("currency", "KES");
-        TestHttpClient.HttpResponse response = walletClient.post("/api/v1/wallets", kesRequest, accessToken);
+        // Create first additional KES wallet
+        Map<String, String> kesRequest1 = new HashMap<>();
+        kesRequest1.put("currency", "KES");
+        TestHttpClient.HttpResponse response1 = walletClient.post("/api/v1/wallets", kesRequest1, accessToken);
+        assertThat(response1.getStatusCode()).isEqualTo(201);
+        log.info("✓ First additional KES wallet created");
 
-        // Should get 4xx error (400 or 409)
-        assertThat(response.getStatusCode()).isGreaterThanOrEqualTo(400).isLessThan(500);
-        log.info("✓ Duplicate currency rejected with status: {}", response.getStatusCode());
+        // Create second additional KES wallet
+        Map<String, String> kesRequest2 = new HashMap<>();
+        kesRequest2.put("currency", "KES");
+        TestHttpClient.HttpResponse response2 = walletClient.post("/api/v1/wallets", kesRequest2, accessToken);
+        assertThat(response2.getStatusCode()).isEqualTo(201);
+        log.info("✓ Second additional KES wallet created");
+
+        // Verify we have multiple KES wallets (1 auto-created + 2 manually created = 3)
+        TestHttpClient.HttpResponse allWallets = walletClient.get("/api/v1/wallets/me", accessToken);
+        List<Map<String, Object>> wallets = walletClient.parseJsonArray(allWallets.getBody());
+        assertThat(wallets).hasSizeGreaterThanOrEqualTo(3);
+        List<String> currencies = wallets.stream()
+                .map(w -> (String) w.get("currency"))
+                .toList();
+        assertThat(currencies).containsOnly("KES");
+        log.info("✓ Customer has {} KES wallets", wallets.size());
     }
 
     @Test

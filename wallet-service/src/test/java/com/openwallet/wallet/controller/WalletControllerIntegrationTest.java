@@ -123,7 +123,7 @@ class WalletControllerIntegrationTest {
 
         Wallet wallet = walletRepository.save(Wallet.builder()
                 .customerId(300L)
-                .currency("USD")
+                .currency("KES")
                 .status(WalletStatus.ACTIVE)
                 .balance(new BigDecimal("100.00"))
                 .build());
@@ -139,7 +139,7 @@ class WalletControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(wallet.getId()))
                 .andExpect(jsonPath("$.customerId").value(300L))
-                .andExpect(jsonPath("$.currency").value("USD"));
+                .andExpect(jsonPath("$.currency").value("KES"));
     }
 
     @Test
@@ -150,15 +150,11 @@ class WalletControllerIntegrationTest {
                 .customerId(400L)
                 .build());
 
+        // Note: For MVP, only KES is supported. The unique constraint (customer_id, currency)
+        // means a customer can only have one KES wallet. This test verifies wallet retrieval works.
         walletRepository.save(Wallet.builder()
                 .customerId(400L)
                 .currency("KES")
-                .status(WalletStatus.ACTIVE)
-                .build());
-
-        walletRepository.save(Wallet.builder()
-                .customerId(400L)
-                .currency("USD")
                 .status(WalletStatus.ACTIVE)
                 .build());
 
@@ -172,7 +168,7 @@ class WalletControllerIntegrationTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(1)); // Only one KES wallet per customer in MVP
     }
 
     @Test

@@ -287,7 +287,7 @@ public class BalanceUpdateFlowTest extends IntegrationTestBase {
         // Create second wallet
         log.info("Step 1: Creating second wallet...");
         Map<String, String> walletRequest = new HashMap<>();
-        walletRequest.put("currency", "USD");
+        walletRequest.put("currency", "KES");
         TestHttpClient.HttpResponse walletBResponse = walletClient.post("/api/v1/wallets", walletRequest, accessToken);
         TestDataValidator.requireSuccess(walletBResponse, "Create wallet B");
         Map<String, Object> walletB = walletClient.parseJson(walletBResponse.getBody());

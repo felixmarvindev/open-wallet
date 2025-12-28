@@ -186,7 +186,7 @@ public class BalanceReconciliationTest extends IntegrationTestBase {
 
         // Create a second wallet for transfer
         Map<String, String> createWallet2Request = new HashMap<>();
-        createWallet2Request.put("currency", "USD");
+        createWallet2Request.put("currency", "KES");
         TestHttpClient.HttpResponse createWallet2Response = walletClient.post("/api/v1/wallets", createWallet2Request, accessToken);
         TestDataValidator.requireSuccess(createWallet2Response, "Create second wallet");
         Long wallet2Id = ((Number) walletClient.parseJson(createWallet2Response.getBody()).get("id")).longValue();

@@ -38,9 +38,9 @@ class WalletControllerValidationTest {
 
     @Test
     void createWalletShouldReturnDetailedValidationErrors() throws Exception {
-        // Given: Invalid request with missing currency and invalid daily limit
+        // Given: Invalid request with invalid daily limit (currency is optional, defaults to KES)
         CreateWalletRequest request = CreateWalletRequest.builder()
-                .currency(null) // Missing required field
+                .currency(null) // Optional - will default to KES
                 .dailyLimit(new java.math.BigDecimal("-100")) // Negative value
                 .build();
 
@@ -85,16 +85,37 @@ class WalletControllerValidationTest {
     }
 
     @Test
-    void createWalletShouldAcceptValidCurrencyCode() throws Exception {
-        // Given: Request with valid currency codes
-        String[] validCurrencies = {"KES", "USD", "EUR", "GBP"};
+    void createWalletShouldAcceptKESCurrency() throws Exception {
+        // Given: Request with KES currency (only supported currency in MVP)
+        CreateWalletRequest request = CreateWalletRequest.builder()
+                .currency("KES")
+                .build();
 
-        for (String currency : validCurrencies) {
+        // When: Creating wallet (will fail due to missing mapping, but validation should pass)
+        mockMvc.perform(post("/api/v1/wallets")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(SecurityMockMvcRequestPostProcessors.jwt()
+                                .jwt(jwt -> jwt.subject("test-user")
+                                        .claim("realm_access",
+                                                Collections.singletonMap("roles",
+                                                        Arrays.asList("USER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
+                .andExpect(status().isBadRequest()) // Bad request due to missing mapping, not validation
+                .andExpect(jsonPath("$.details").doesNotExist()); // No validation errors
+    }
+
+    @Test
+    void createWalletShouldRejectNonKESCurrency() throws Exception {
+        // Given: Request with non-KES currency (not supported in MVP)
+        String[] nonKESCurrencies = {"USD", "EUR", "GBP"};
+
+        for (String currency : nonKESCurrencies) {
             CreateWalletRequest request = CreateWalletRequest.builder()
                     .currency(currency)
                     .build();
 
-            // When: Creating wallet (will fail due to missing mapping, but validation should pass)
+            // When: Creating wallet
             mockMvc.perform(post("/api/v1/wallets")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(request))
@@ -104,8 +125,9 @@ class WalletControllerValidationTest {
                                                     Collections.singletonMap("roles",
                                                             Arrays.asList("USER"))))
                                     .authorities(new SimpleGrantedAuthority("ROLE_USER"))))
-                    .andExpect(status().isBadRequest()) // Bad request due to missing mapping, not validation
-                    .andExpect(jsonPath("$.details").doesNotExist()); // No validation errors
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Only KES currency is supported")));
         }
     }
 }

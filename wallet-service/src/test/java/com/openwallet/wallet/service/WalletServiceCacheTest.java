@@ -55,7 +55,7 @@ class WalletServiceCacheTest {
         Wallet wallet = Wallet.builder()
                 .id(2L)
                 .customerId(11L)
-                .currency("USD")
+                .currency("KES")
                 .balance(new BigDecimal("20.00"))
                 .build();
         when(balanceCacheService.getBalance(2L)).thenReturn(Optional.empty());

@@ -67,7 +67,7 @@ class TransactionControllerTest {
         WithdrawalRequest request = WithdrawalRequest.builder()
                 .fromWalletId(6L)
                 .amount(new BigDecimal("5.00"))
-                .currency("USD")
+                .currency("KES")
                 .idempotencyKey("wd-1")
                 .build();
 
@@ -88,7 +88,7 @@ class TransactionControllerTest {
                 .fromWalletId(7L)
                 .toWalletId(8L)
                 .amount(new BigDecimal("15.00"))
-                .currency("EUR")
+                .currency("KES")
                 .idempotencyKey("tr-1")
                 .build();
 
